@@ -7,6 +7,7 @@ export * from "./config.js";
 export * from "./registry.js";
 export * from "./add-helpers.js";
 export * from "./cli.js";
+export * from "./bundler.js";
 
 // Re-export common dependencies so consumers don't need to declare them directly
 export { Command } from "commander";
