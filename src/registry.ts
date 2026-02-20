@@ -21,9 +21,7 @@ export const RegistryItemSchema = z.object({
   dependencies: z.array(z.string()),
   registryDependencies: z.array(z.string()),
   files: z.array(RegistryFileSchema),
-  client: z.boolean().optional().default(true),
-  hidden: z.boolean().optional().default(false),
-  optionalIntegrations: z.array(z.string()).optional().default([]),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type RegistryFile = z.infer<typeof RegistryFileSchema>;
@@ -54,6 +52,8 @@ export function resolveRegistryDeps(
 
     stack.push(name);
     for (const dep of item.registryDependencies) {
+      // Skip URL-based deps (cross-registry refs resolved by shadcn, not the custom CLI)
+      if (dep.startsWith("http://") || dep.startsWith("https://")) continue;
       walk(dep);
     }
     stack.pop();
@@ -120,4 +120,12 @@ export function createRegistryLoader<TBundle extends { integrity?: string }>(
     cached = bundle;
     return cached;
   };
+}
+
+/**
+ * Type-safe accessor for fields stored in a registry item's `meta` object.
+ */
+export function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
+  const val = item.meta?.[key];
+  return val !== undefined ? (val as T) : fallback;
 }

@@ -58,9 +58,7 @@ const RegistrySourceItemSchema = z.object({
   dependencies: z.array(z.string()).optional().default([]),
   registryDependencies: z.array(z.string()).optional().default([]),
   files: z.array(RegistrySourceFileSchema),
-  client: z.boolean().optional(),
-  hidden: z.boolean().optional(),
-  optionalIntegrations: z.array(z.string()).optional().default([]),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 const RegistrySourceSchema = z.object({
@@ -84,9 +82,7 @@ export interface BundleItem {
   dependencies: string[];
   registryDependencies: string[];
   files: BundleFile[];
-  client: boolean;
-  hidden: boolean;
-  optionalIntegrations: string[];
+  meta?: Record<string, unknown>;
 }
 
 export interface BundlerConfig {
@@ -114,6 +110,11 @@ export interface BundleResult {
   items: BundleItem[];
   integrity: string;
   extra: Record<string, unknown>;
+}
+
+function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
+  const val = item.meta?.[key];
+  return val !== undefined ? (val as T) : fallback;
 }
 
 export function createBundler(config: BundlerConfig): () => BundleResult {
@@ -170,9 +171,10 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       names.add(item.name);
     }
 
-    // Validate registry dependencies exist
+    // Validate registry dependencies exist (skip URL-based deps — those are cross-registry refs)
     for (const item of sourceItems) {
       for (const dep of item.registryDependencies) {
+        if (dep.startsWith("http://") || dep.startsWith("https://")) continue;
         if (!names.has(dep)) {
           console.error(`Error: "${item.name}" has registryDependency "${dep}" which doesn't exist`);
           process.exit(1);
@@ -216,9 +218,11 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
         dependencies: [...allDetectedDeps],
         registryDependencies: item.registryDependencies,
         files,
-        client: item.client ?? clientDefault,
-        hidden: item.hidden ?? false,
-        optionalIntegrations: item.optionalIntegrations,
+        meta: {
+          client: metaField(item, "client", clientDefault),
+          hidden: metaField(item, "hidden", false),
+          optionalIntegrations: metaField<string[]>(item, "optionalIntegrations", []),
+        },
       });
     }
 
