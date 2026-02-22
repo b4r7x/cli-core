@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync, renameSync 
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { parseRegistryDependencyRef } from "./registry.js";
 
 // ---------------------------------------------------------------------------
 // detectNpmImports — shared import detection for bundle-registry scripts
@@ -171,11 +172,12 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       names.add(item.name);
     }
 
-    // Validate registry dependencies exist (skip URL-based deps — those are cross-registry refs)
+    // Validate local registry dependencies exist (namespace refs are cross-registry)
     for (const item of sourceItems) {
       for (const dep of item.registryDependencies) {
-        if (dep.startsWith("http://") || dep.startsWith("https://")) continue;
-        if (!names.has(dep)) {
+        const parsed = parseRegistryDependencyRef(dep);
+        if (parsed.kind !== "local") continue;
+        if (!names.has(parsed.name)) {
           console.error(`Error: "${item.name}" has registryDependency "${dep}" which doesn't exist`);
           process.exit(1);
         }
