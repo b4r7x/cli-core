@@ -9,9 +9,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./artifacts": "./artifacts.mjs"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "artifacts.mjs"
+  ],
   "engines": {
     "node": ">=18"
   },

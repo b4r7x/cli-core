@@ -27,6 +27,42 @@ export const RegistryItemSchema = z.object({
 export type RegistryFile = z.infer<typeof RegistryFileSchema>;
 export type RegistryItem = z.infer<typeof RegistryItemSchema>;
 
+export type ParsedRegistryDependencyRef =
+  | { kind: "local"; raw: string; name: string }
+  | { kind: "namespace"; raw: string; namespace: string; name: string };
+
+const NAMESPACE_REF_RE = /^(@[a-z0-9][\w-]*)\/([a-z0-9][\w-]*)$/i;
+
+/**
+ * Parses a registry dependency ref into one of:
+ * - local item name (e.g. "controllable-state")
+ * - namespaced ref (e.g. "@keyscope/navigation")
+ */
+export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependencyRef {
+  const raw = ref.trim();
+  if (raw.length === 0) {
+    throw new Error("Registry dependency ref cannot be empty.");
+  }
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    throw new Error(
+      `URL registry dependency refs are no longer supported: "${raw}". Use namespace refs (e.g. "@keyscope/navigation").`,
+    );
+  }
+
+  const namespaceMatch = NAMESPACE_REF_RE.exec(raw);
+  if (namespaceMatch) {
+    return {
+      kind: "namespace",
+      raw,
+      namespace: namespaceMatch[1],
+      name: namespaceMatch[2],
+    };
+  }
+
+  return { kind: "local", raw, name: raw };
+}
+
 export function resolveRegistryDeps(
   names: string[],
   getItem: (name: string) => RegistryItem | undefined,
@@ -52,9 +88,10 @@ export function resolveRegistryDeps(
 
     stack.push(name);
     for (const dep of item.registryDependencies) {
-      // Skip URL-based deps (cross-registry refs resolved by shadcn, not the custom CLI)
-      if (dep.startsWith("http://") || dep.startsWith("https://")) continue;
-      walk(dep);
+      const parsed = parseRegistryDependencyRef(dep);
+      // Skip cross-registry namespace refs. They are resolved by shadcn/consumer config.
+      if (parsed.kind !== "local") continue;
+      walk(parsed.name);
     }
     stack.pop();
     resolved.add(name);
