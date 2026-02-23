@@ -8,7 +8,11 @@ export * from "./registry.js";
 export * from "./add-helpers.js";
 export * from "./cli.js";
 export * from "./bundler.js";
-export * from "./workflows.js";
+export * from "./workflows/list.js";
+export * from "./workflows/diff.js";
+export * from "./workflows/remove.js";
+export * from "./workflows/add.js";
+export * from "./workflows/apply-install-plan.js";
 
 // Re-export common dependencies so consumers don't need to declare them directly
 export { Command } from "commander";

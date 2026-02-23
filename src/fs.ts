@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync, renameSync, cpSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -112,4 +112,23 @@ export function writeFileSafe(
   }
 
   return exists ? "overwritten" : "written";
+}
+
+/**
+ * Copies a generated directory from src to dist after TypeScript compilation.
+ *
+ * @param pkgRoot - Absolute path to the package root directory.
+ * @param srcRelative - Relative path from pkgRoot to the source generated dir (e.g. "src/cli/generated").
+ * @param distRelative - Relative path from pkgRoot to the dist generated dir (e.g. "dist/cli/generated").
+ */
+export function copyGeneratedDir(
+  pkgRoot: string,
+  srcRelative: string,
+  distRelative: string,
+): void {
+  const src = resolve(pkgRoot, srcRelative);
+  if (!existsSync(src)) {
+    throw new Error(`${srcRelative}/ not found. Run prebuild first.`);
+  }
+  cpSync(src, resolve(pkgRoot, distRelative), { recursive: true, force: true });
 }

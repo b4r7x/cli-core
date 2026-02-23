@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { parseRegistryDependencyRef } from "./registry.js";
+import { metaField, parseRegistryDependencyRef } from "./registry.js";
 
 // ---------------------------------------------------------------------------
 // detectNpmImports — shared import detection for bundle-registry scripts
@@ -113,11 +113,6 @@ export interface BundleResult {
   extra: Record<string, unknown>;
 }
 
-function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
-  const val = item.meta?.[key];
-  return val !== undefined ? (val as T) : fallback;
-}
-
 export function createBundler(config: BundlerConfig): () => BundleResult {
   return (): BundleResult => {
     const {
@@ -139,25 +134,20 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     // Load and validate registry.json
     const registryPath = resolve(rootDir, "registry/registry.json");
     if (!existsSync(registryPath)) {
-      console.error(`Error: registry.json not found at ${registryPath}.`);
-      process.exit(1);
+      throw new Error(`registry.json not found at ${registryPath}.`);
     }
 
     let registryRaw: unknown;
     try {
       registryRaw = JSON.parse(readFileSync(registryPath, "utf-8"));
     } catch (e) {
-      console.error(`Error: Failed to parse registry.json: ${e instanceof Error ? e.message : e}`);
-      process.exit(1);
+      throw new Error(`Failed to parse registry.json: ${e instanceof Error ? e.message : e}`);
     }
 
     const parsed = RegistrySourceSchema.safeParse(registryRaw);
     if (!parsed.success) {
-      console.error("Error: Invalid registry.json schema:");
-      for (const issue of parsed.error.issues) {
-        console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
-      }
-      process.exit(1);
+      const issues = parsed.error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`).join("\n");
+      throw new Error(`Invalid registry.json schema:\n${issues}`);
     }
 
     const { items: sourceItems } = parsed.data;
@@ -166,8 +156,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     const names = new Set<string>();
     for (const item of sourceItems) {
       if (names.has(item.name)) {
-        console.error(`Error: Duplicate ${itemLabel} name: "${item.name}"`);
-        process.exit(1);
+        throw new Error(`Duplicate ${itemLabel} name: "${item.name}"`);
       }
       names.add(item.name);
     }
@@ -178,8 +167,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
         const parsed = parseRegistryDependencyRef(dep);
         if (parsed.kind !== "local") continue;
         if (!names.has(parsed.name)) {
-          console.error(`Error: "${item.name}" has registryDependency "${dep}" which doesn't exist`);
-          process.exit(1);
+          throw new Error(`"${item.name}" has registryDependency "${dep}" which doesn't exist`);
         }
       }
     }
@@ -194,9 +182,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       for (const file of item.files) {
         const filePath = resolve(rootDir, file.path);
         if (!existsSync(filePath)) {
-          console.error(`Error: File not found for ${itemLabel} "${item.name}": ${file.path}`);
-          console.error(`  Expected at: ${filePath}`);
-          process.exit(1);
+          throw new Error(`File not found for ${itemLabel} "${item.name}": ${file.path}\n  Expected at: ${filePath}`);
         }
 
         const content = readFileSync(filePath, "utf-8");
@@ -261,29 +247,4 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
 
     return { items, integrity, extra };
   };
-}
-
-// ---------------------------------------------------------------------------
-// copyGeneratedDir — shared post-build copy for generated registry bundles
-// ---------------------------------------------------------------------------
-
-/**
- * Copies the generated registry bundle directory from src to dist.
- * Used in `copy-generated.ts` scripts after TypeScript compilation.
- *
- * @param pkgRoot - Absolute path to the package root directory.
- * @param srcRelative - Relative path from pkgRoot to the source generated dir (e.g. "src/cli/generated").
- * @param distRelative - Relative path from pkgRoot to the dist generated dir (e.g. "dist/cli/generated").
- */
-export function copyGeneratedDir(
-  pkgRoot: string,
-  srcRelative: string,
-  distRelative: string,
-): void {
-  const src = resolve(pkgRoot, srcRelative);
-  if (!existsSync(src)) {
-    console.error(`Error: ${srcRelative}/ not found. Run prebuild first.`);
-    process.exit(1);
-  }
-  cpSync(src, resolve(pkgRoot, distRelative), { recursive: true, force: true });
 }
