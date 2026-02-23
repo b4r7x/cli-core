@@ -27,6 +27,17 @@ export const RegistryItemSchema = z.object({
 export type RegistryFile = z.infer<typeof RegistryFileSchema>;
 export type RegistryItem = z.infer<typeof RegistryItemSchema>;
 
+export const RegistryContentFileSchema = RegistryFileSchema.extend({
+  content: z.string(),
+});
+
+export const RegistryContentItemSchema = RegistryItemSchema.extend({
+  files: z.array(RegistryContentFileSchema),
+});
+
+export type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
+export type RegistryContentItem = z.infer<typeof RegistryContentItemSchema>;
+
 export type ParsedRegistryDependencyRef =
   | { kind: "local"; raw: string; name: string }
   | { kind: "namespace"; raw: string; namespace: string; name: string };
