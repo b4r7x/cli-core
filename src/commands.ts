@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { error, toErrorMessage } from "./logger.js";
 import type { ConfigLoadResult } from "./config.js";
 import type { RegistryItem } from "./registry.js";
@@ -86,4 +88,56 @@ export function getRelativePath(
   throw new Error(
     `Unsupported registry file path "${file.path}". Expected path to start with one of: ${prefixes.map(p => `"${p}"`).join(", ")}.`,
   );
+}
+
+/**
+ * Validates a CLI option value against an enum of allowed values.
+ * Returns the value if valid, throws a user-friendly error otherwise.
+ */
+export function parseEnumOption<T extends string>(
+  value: string,
+  validValues: readonly T[],
+  optionName: string,
+): T {
+  if (!validValues.includes(value as T)) {
+    throw new Error(
+      `Invalid ${optionName}: "${value}". Must be one of: ${validValues.join(", ")}`,
+    );
+  }
+  return value as T;
+}
+
+/**
+ * Factory that creates an install checker function.
+ * Checks manifest first, then falls back to filesystem detection.
+ */
+export function createInstallChecker(options: {
+  getManifest: () => Record<string, unknown> | undefined;
+  getItem: (name: string) => RegistryItem | undefined;
+  getRelativePath: (file: { path: string; targetPath?: string }) => string;
+  installDir: string;
+  extensions?: string[];
+}): (name: string) => boolean {
+  const exts = options.extensions ?? [".tsx", ".ts", ".jsx", ".js"];
+
+  return (name: string): boolean => {
+    const manifest = options.getManifest();
+    if (manifest && name in manifest) return true;
+
+    const item = options.getItem(name);
+    if (!item) return false;
+
+    return item.files.some((file) => {
+      const relativePath = options.getRelativePath(file);
+      const base = resolve(options.installDir, relativePath);
+
+      if (existsSync(base)) return true;
+
+      for (const ext of exts) {
+        if (existsSync(base + ext)) return true;
+        if (existsSync(resolve(base, `index${ext}`))) return true;
+      }
+      return false;
+    });
+  };
 }

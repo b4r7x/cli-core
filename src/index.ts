@@ -12,6 +12,7 @@ export * from "./workflows/list.js";
 export * from "./workflows/diff.js";
 export * from "./workflows/remove.js";
 export * from "./workflows/add.js";
+export * from "./workflows/init.js";
 export * from "./workflows/apply-install-plan.js";
 
 // Re-export common dependencies so consumers don't need to declare them directly
