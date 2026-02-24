@@ -100,6 +100,10 @@ export async function promptText(message: string, opts?: {
   return result;
 }
 
+export function newline(): void {
+  if (!isSilent) console.log();
+}
+
 export function isSilentMode(): boolean {
   return isSilent;
 }

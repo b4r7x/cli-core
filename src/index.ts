@@ -1,6 +1,6 @@
 export { ensureWithinDir, ensureWithinAnyDir, readTsConfigPaths, writeFileSafe, copyGeneratedDir, type WriteResult } from "./fs.js";
 export { depName, normalizeVersionSpec, getInstalledDeps, installDepsWithSpinner } from "./package-manager.js";
-export { CancelError, info, success, warn, error, toErrorMessage, fileAction, heading, promptConfirm, promptSelect, promptText } from "./logger.js";
+export { CancelError, info, success, warn, error, toErrorMessage, fileAction, heading, newline, promptConfirm, promptSelect, promptText } from "./logger.js";
 export * from "./detect.js";
 export * from "./command-helpers.js";
 export * from "./config.js";

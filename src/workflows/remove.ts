@@ -7,6 +7,7 @@ import {
   fileAction,
   heading,
   info,
+  newline,
   promptConfirm,
   success,
   toErrorMessage,
@@ -120,7 +121,7 @@ export async function runRemoveWorkflow<TItem, TConfig>(
   for (const file of filesToRemove) {
     fileAction(pc.red("-"), relative(cwd, file));
   }
-  console.log();
+  newline();
 
   if (dryRun) {
     info("(dry run - no changes made)");
@@ -158,7 +159,7 @@ export async function runRemoveWorkflow<TItem, TConfig>(
     info(`Note: You may want to remove unused packages: ${orphaned.join(", ")}`);
   }
 
-  console.log();
+  newline();
   success(`Removed ${removed} file(s) (${names.join(", ")}).`);
-  console.log();
+  newline();
 }

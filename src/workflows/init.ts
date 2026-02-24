@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { info, success, warn, heading, fileAction, promptConfirm } from "../logger.js";
+import { info, success, warn, heading, fileAction, newline, promptConfirm } from "../logger.js";
 import type { ConfigLoadResult } from "../config.js";
 import pc from "picocolors";
 
@@ -72,7 +72,7 @@ export async function runInitWorkflow<TConfig>(options: InitWorkflowOptions<TCon
   for (const [label, value] of project.display) {
     info(`${label}: ${value}`);
   }
-  console.log();
+  newline();
 
   if (!yes) {
     const proceed = await promptConfirm("Continue with initialization?");
@@ -98,10 +98,10 @@ export async function runInitWorkflow<TConfig>(options: InitWorkflowOptions<TCon
   await writeConfig(cwd);
   fileAction(pc.green("+"), configFileName);
 
-  console.log();
+  newline();
   success("Done!");
   for (const step of nextSteps) {
     info(step);
   }
-  console.log();
+  newline();
 }

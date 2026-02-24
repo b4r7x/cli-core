@@ -155,4 +155,3 @@ export async function installDepsWithRollback(
   }
 }
 
-export { installDepsWithSpinner } from "./package-manager.js";

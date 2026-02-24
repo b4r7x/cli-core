@@ -47,7 +47,7 @@ const NAMESPACE_REF_RE = /^(@[a-z0-9][\w-]*)\/([a-z0-9][\w-]*)$/i;
 /**
  * Parses a registry dependency ref into one of:
  * - local item name (e.g. "controllable-state")
- * - namespaced ref (e.g. "@keyscope/navigation")
+ * - namespaced ref (e.g. "@yourlib/item-name")
  */
 export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependencyRef {
   const raw = ref.trim();

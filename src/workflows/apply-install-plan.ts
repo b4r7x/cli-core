@@ -7,7 +7,7 @@ import {
   type WriteFilesResult,
   writeFilesWithRollback,
 } from "../add-helpers.js";
-import { heading, info, promptConfirm, success } from "../logger.js";
+import { heading, info, newline, promptConfirm, success } from "../logger.js";
 
 export interface ApplyInstallPlanOptions {
   cwd: string;
@@ -52,7 +52,7 @@ export async function applyInstallPlan(
     showDryRunPreview(fileOps, overwrite);
     showDryRunDeps(missingDeps);
     onDryRun?.();
-    console.log();
+    newline();
     info("(dry run - no changes made)");
     return;
   }
@@ -78,9 +78,9 @@ export async function applyInstallPlan(
   }
   await onApplied?.(writeResult);
 
-  console.log();
+  newline();
   success(formatWriteSummary(writeResult));
-  console.log();
+  newline();
 }
 
 function isTruthyFlag(value: string | undefined): boolean {

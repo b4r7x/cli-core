@@ -1,4 +1,4 @@
-import { info } from "../logger.js";
+import { info, newline } from "../logger.js";
 
 export interface ListDisplayItem {
   name: string;
@@ -53,20 +53,20 @@ export function runListWorkflow<TItem, TConfig>(
   }
 
   if (displayItems.length === 0) {
-    console.log();
+    newline();
     info(installedOnly ? `No installed ${itemPlural} found.` : `No ${itemPlural} available.`);
-    console.log();
+    newline();
     return;
   }
 
   const label = installedOnly ? "Installed" : "Available";
-  console.log();
+  newline();
   info(`${label} ${itemPlural} (${displayItems.length}):`);
-  console.log();
+  newline();
 
   const maxLen = Math.max(...displayItems.map((item) => item.name.length)) + 2;
   for (const item of displayItems) {
     info(`  ${item.name.padEnd(maxLen)} ${item.description}`);
   }
-  console.log();
+  newline();
 }

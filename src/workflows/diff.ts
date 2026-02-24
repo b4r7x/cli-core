@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import pc from "picocolors";
 import { createTwoFilesPatch } from "diff";
-import { heading, info } from "../logger.js";
+import { heading, info, newline } from "../logger.js";
 
 export interface DiffWorkflowFile {
   itemName: string;
@@ -121,7 +121,7 @@ export function runDiffWorkflow<TConfig>(
     }
   }
 
-  console.log();
+  newline();
   if (changed === 0 && notInstalled === 0) {
     info(upToDateMessage);
     return;
