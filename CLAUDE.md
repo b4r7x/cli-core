@@ -52,12 +52,16 @@ src/
 ├── cli.ts                # createCli, runCli
 ├── registry.ts           # types, loader, dependency resolution
 ├── config.ts             # JSON config I/O
-├── commands.ts           # withErrorHandler, createRequireConfig, getItemOrThrow
+├── command-helpers.ts    # withErrorHandler, createRequireConfig, getItemOrThrow
 ├── logger.ts             # output + prompts
 ├── detect.ts             # package manager, source dir
 ├── package-manager.ts    # npm install utilities
 ├── add-helpers.ts        # file writing with rollback
-├── bundler.ts            # registry bundler
+├── bundler/              # registry bundler
+│   ├── index.ts          # createBundler entry point
+│   ├── types.ts          # bundler types
+│   ├── schemas.ts        # bundler schemas
+│   └── detect-imports.ts # detectNpmImports
 ├── fs.ts                 # filesystem utilities
 └── workflows/
     ├── init.ts           # (planned) generic init workflow

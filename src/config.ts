@@ -5,8 +5,6 @@ import { z } from "zod";
 import { toErrorMessage, warn } from "./logger.js";
 import { detectSourceDir } from "./detect.js";
 
-export { detectSourceDir as detectSourceDirFromTsconfig };
-
 export const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
 
 export function aliasToFsPath(alias: string, sourceDir?: string): string {
