@@ -1,19 +1,19 @@
-export * from "./fs.js";
-export * from "./package-manager.js";
-export * from "./logger.js";
+export { ensureWithinDir, ensureWithinAnyDir, readTsConfigPaths, writeFileSafe, copyGeneratedDir, type WriteResult } from "./fs.js";
+export { depName, normalizeVersionSpec, getInstalledDeps, installDepsWithSpinner } from "./package-manager.js";
+export { CancelError, info, success, warn, error, toErrorMessage, fileAction, heading, promptConfirm, promptSelect, promptText } from "./logger.js";
 export * from "./detect.js";
-export * from "./commands.js";
+export * from "./command-helpers.js";
 export * from "./config.js";
 export * from "./registry.js";
-export * from "./add-helpers.js";
+export type { FileOp, WriteFilesResult } from "./add-helpers.js";
 export * from "./cli.js";
-export * from "./bundler.js";
+export * from "./bundler/index.js";
 export * from "./workflows/list.js";
 export * from "./workflows/diff.js";
 export * from "./workflows/remove.js";
 export * from "./workflows/add.js";
 export * from "./workflows/init.js";
-export * from "./workflows/apply-install-plan.js";
+export type { ApplyInstallPlanOptions } from "./workflows/apply-install-plan.js";
 
 // Re-export common dependencies so consumers don't need to declare them directly
 export { Command } from "commander";

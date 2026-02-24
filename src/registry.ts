@@ -57,7 +57,7 @@ export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependenc
 
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     throw new Error(
-      `URL registry dependency refs are no longer supported: "${raw}". Use namespace refs (e.g. "@keyscope/navigation").`,
+      `URL registry dependency refs are no longer supported: "${raw}". Use namespace refs (e.g. "@yourlib/item-name").`,
     );
   }
 

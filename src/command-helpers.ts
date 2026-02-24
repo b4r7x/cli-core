@@ -108,8 +108,9 @@ export function parseEnumOption<T extends string>(
 }
 
 /**
- * Factory that creates an install checker function.
- * Checks manifest first, then falls back to filesystem detection.
+ * Checks for installed items by name. Looks up manifest first, then falls back to
+ * filesystem detection. Filesystem check tries: exact path, path with each extension
+ * (.tsx, .ts, .jsx, .js), and path/index with each extension (for directory-style modules).
  */
 export function createInstallChecker(options: {
   getManifest: () => Record<string, unknown> | undefined;

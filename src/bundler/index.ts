@@ -1,126 +1,26 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { z } from "zod";
-import { metaField, parseRegistryDependencyRef } from "./registry.js";
+import { metaField, parseRegistryDependencyRef } from "../registry.js";
+import { info, heading } from "../logger.js";
+import { detectNpmImports } from "./detect-imports.js";
+import type { DetectNpmImportsOptions } from "./detect-imports.js";
+import { RegistrySourceSchema } from "./schemas.js";
+import type { BundleFile, BundleItem, BundlerConfig, BundleResult } from "./types.js";
 
-// ---------------------------------------------------------------------------
-// detectNpmImports — shared import detection for bundle-registry scripts
-// ---------------------------------------------------------------------------
-
-const DEFAULT_PEER_DEPS = new Set(["react", "react-dom"]);
-const DEFAULT_ALIAS_PREFIXES = ["@/", "./", "../", "node:"];
-
-export interface DetectNpmImportsOptions {
-  peerDeps?: Set<string>;
-  aliasPrefixes?: string[];
-}
-
-export function detectNpmImports(
-  content: string,
-  options?: DetectNpmImportsOptions,
-): string[] {
-  const peerDeps = options?.peerDeps ?? DEFAULT_PEER_DEPS;
-  const aliasPrefixes = options?.aliasPrefixes ?? DEFAULT_ALIAS_PREFIXES;
-  const imports: string[] = [];
-
-  for (const line of content.split("\n")) {
-    if (/^\s*import\s+type\s/.test(line)) continue;
-    if (/^\s*export\s+type\s/.test(line)) continue;
-
-    const match = /from\s+["']([^"']+)["']/.exec(line);
-    if (!match) continue;
-
-    const pkg = match[1]!;
-    if (aliasPrefixes.some((p) => pkg.startsWith(p))) continue;
-
-    const parts = pkg.split("/");
-    const pkgName = pkg.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]!;
-    if (!peerDeps.has(pkgName)) imports.push(pkgName);
-  }
-
-  return [...new Set(imports)];
-}
-
-// ---------------------------------------------------------------------------
-// createBundler — factory for registry bundle scripts
-// ---------------------------------------------------------------------------
-
-const RegistrySourceFileSchema = z.object({
-  path: z.string(),
-  type: z.string().optional(),
-});
-
-const RegistrySourceItemSchema = z.object({
-  name: z.string(),
-  type: z.string(),
-  title: z.string(),
-  description: z.string(),
-  dependencies: z.array(z.string()).optional().default([]),
-  registryDependencies: z.array(z.string()).optional().default([]),
-  files: z.array(RegistrySourceFileSchema),
-  meta: z.record(z.string(), z.unknown()).optional(),
-});
-
-const RegistrySourceSchema = z.object({
-  items: z.array(RegistrySourceItemSchema),
-});
-
-type RegistrySourceItem = z.infer<typeof RegistrySourceItemSchema>;
-
-export interface BundleFile {
-  path: string;
-  content: string;
-  targetPath?: string;
-  type?: string;
-}
-
-export interface BundleItem {
-  name: string;
-  type: string;
-  title: string;
-  description: string;
-  dependencies: string[];
-  registryDependencies: string[];
-  files: BundleFile[];
-  meta?: Record<string, unknown>;
-}
-
-export interface BundlerConfig {
-  /** Absolute path to the project root (where registry/ lives). */
-  rootDir: string;
-  /** Absolute path to output the bundle JSON. */
-  outputPath: string;
-  /** Peer deps to exclude from npm import detection. */
-  peerDeps?: Set<string>;
-  /** Core deps to strip from detected dependencies (e.g. cva, clsx). */
-  coreDeps?: Set<string>;
-  /** Import path prefixes to skip during npm import detection. */
-  aliasPrefixes?: string[];
-  /** Optional path rewriting for bundle file paths. */
-  transformPath?: (path: string) => string;
-  /** Return extra top-level fields to include in the bundle (e.g. theme, styles). */
-  extraContent?: (rootDir: string) => Record<string, unknown>;
-  /** Default value for the `client` field when not specified. */
-  clientDefault?: boolean;
-  /** Label for items in error messages (e.g. "hook", "component"). */
-  itemLabel?: string;
-}
-
-export interface BundleResult {
-  items: BundleItem[];
-  integrity: string;
-  extra: Record<string, unknown>;
-}
+export { detectNpmImports } from "./detect-imports.js";
+export type { DetectNpmImportsOptions } from "./detect-imports.js";
+export type { RegistrySourceItem } from "./schemas.js";
+export * from "./types.js";
 
 export function createBundler(config: BundlerConfig): () => BundleResult {
   return (): BundleResult => {
     const {
       rootDir,
       outputPath,
-      peerDeps = DEFAULT_PEER_DEPS,
+      peerDeps,
       coreDeps,
-      aliasPrefixes = DEFAULT_ALIAS_PREFIXES,
+      aliasPrefixes,
       transformPath,
       extraContent,
       clientDefault = false,
@@ -129,7 +29,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
 
     const detectOpts: DetectNpmImportsOptions = { peerDeps, aliasPrefixes };
 
-    console.log("Bundling registry...");
+    info("Bundling registry...");
 
     // Load and validate registry.json
     const registryPath = resolve(rootDir, "registry/registry.json");
@@ -233,15 +133,18 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     // Summary
     const totalFiles = items.reduce((acc, i) => acc + i.files.length, 0);
     const sizeKb = (Buffer.byteLength(bundleJson) / 1024).toFixed(1);
-    console.log(`  Bundled ${items.length} ${itemLabel}s (${totalFiles} files)`);
-    console.log(`  Bundle size: ${sizeKb} KB`);
-    console.log(`  Integrity: ${integrity}`);
-    console.log(`  Output: ${outputPath}`);
 
-    console.log("\n  Dependencies:");
-    for (const item of items) {
-      if (item.dependencies.length > 0) {
-        console.log(`    ${item.name}: ${item.dependencies.join(", ")}`);
+    heading("Bundle summary:");
+    info(`Bundled ${items.length} ${itemLabel}s (${totalFiles} files)`);
+    info(`Bundle size: ${sizeKb} KB`);
+    info(`Integrity: ${integrity}`);
+    info(`Output: ${outputPath}`);
+
+    const itemsWithDeps = items.filter(i => i.dependencies.length > 0);
+    if (itemsWithDeps.length > 0) {
+      heading("Dependencies:");
+      for (const item of itemsWithDeps) {
+        info(`  ${item.name}: ${item.dependencies.join(", ")}`);
       }
     }
 

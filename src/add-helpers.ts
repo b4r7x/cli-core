@@ -1,12 +1,10 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import pc from "picocolors";
-import * as clack from "@clack/prompts";
 import { writeFileSafe, cleanEmptyDirs } from "./fs.js";
-import { info, warn, heading, fileAction, error, toErrorMessage, isSilentMode } from "./logger.js";
+import { info, warn, heading, fileAction, toErrorMessage } from "./logger.js";
 import { detectPackageManager } from "./detect.js";
-import type { PackageManager } from "./detect.js";
-import { installDeps } from "./package-manager.js";
+import { installDepsWithSpinner } from "./package-manager.js";
 
 export interface FileOp {
   targetPath: string;
@@ -15,7 +13,7 @@ export interface FileOp {
   installDir: string;
 }
 
-export function rollbackFiles(
+function rollbackFiles(
   newFiles: string[],
   backups: Array<{ path: string; content: string }>,
   createdDirs: string[],
@@ -157,39 +155,4 @@ export async function installDepsWithRollback(
   }
 }
 
-export async function installDepsWithSpinner(
-  pm: PackageManager,
-  deps: string[],
-  cwd: string,
-): Promise<boolean> {
-  if (isSilentMode()) {
-    try {
-      await installDeps(pm, deps, cwd);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  const s = clack.spinner();
-  s.start("Installing dependencies...");
-  try {
-    await installDeps(pm, deps, cwd);
-    s.stop(`Installed ${deps.length} package(s)`);
-    return true;
-  } catch (e) {
-    s.stop("Failed to install dependencies");
-    if (e instanceof Error) {
-      const lines = e.message.split("\n").filter(Boolean);
-      const maxLines = process.env.DEBUG ? lines.length : 3;
-      for (const line of lines.slice(0, maxLines)) {
-        error(line);
-      }
-      if (!process.env.DEBUG && lines.length > maxLines) {
-        error(`  ... ${lines.length - maxLines} more lines (set DEBUG=1 for full output)`);
-      }
-    }
-    error(`Try manually: ${pm} add ${deps.join(" ")}`);
-    return false;
-  }
-}
+export { installDepsWithSpinner } from "./package-manager.js";

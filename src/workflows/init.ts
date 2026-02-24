@@ -8,7 +8,7 @@ export interface InitWorkflowOptions<TConfig> {
   /** Working directory */
   cwd: string;
 
-  /** Config file name (e.g., "keyscope.json") */
+  /** Config file name (e.g., "mylib.json") */
   configFileName: string;
 
   /** Skip confirmation prompts */
@@ -32,7 +32,7 @@ export interface InitWorkflowOptions<TConfig> {
   /** Write the config file */
   writeConfig: (cwd: string) => void | Promise<void>;
 
-  /** Message shown after success (e.g., "Add hooks with: npx keyscope add <hook>") */
+  /** Message shown after success (e.g., "Add items with: npx mylib add <item>") */
   nextSteps: string[];
 }
 

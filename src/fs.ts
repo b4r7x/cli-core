@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 
-export function stripJsonComments(json: string): string {
+function stripJsonComments(json: string): string {
   let result = "";
   let i = 0;
   let inString = false;

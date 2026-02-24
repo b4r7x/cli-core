@@ -2,7 +2,8 @@ import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PackageManager } from "./detect.js";
-import { warn, toErrorMessage } from "./logger.js";
+import * as clack from "@clack/prompts";
+import { warn, error, toErrorMessage, isSilentMode } from "./logger.js";
 
 const VALID_PKG_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
 const VERSION_SPEC_PATTERN = /^[a-zA-Z0-9._\-~/^*@:+]+$/;
@@ -32,7 +33,7 @@ export function normalizeVersionSpec(raw: unknown, packageName = "package"): str
   return spec;
 }
 
-export function validatePackageNames(deps: string[]): void {
+function validatePackageNames(deps: string[]): void {
   for (const dep of deps) {
     const searchFrom = dep.startsWith("@") ? dep.indexOf("/") + 1 : 0;
     const versionAt = dep.indexOf("@", searchFrom);
@@ -59,6 +60,43 @@ export async function installDeps(pm: PackageManager, deps: string[], cwd: strin
       res();
     });
   });
+}
+
+export async function installDepsWithSpinner(
+  pm: PackageManager,
+  deps: string[],
+  cwd: string,
+): Promise<boolean> {
+  if (isSilentMode()) {
+    try {
+      await installDeps(pm, deps, cwd);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const s = clack.spinner();
+  s.start("Installing dependencies...");
+  try {
+    await installDeps(pm, deps, cwd);
+    s.stop(`Installed ${deps.length} package(s)`);
+    return true;
+  } catch (e) {
+    s.stop("Failed to install dependencies");
+    if (e instanceof Error) {
+      const lines = e.message.split("\n").filter(Boolean);
+      const maxLines = process.env.DEBUG ? lines.length : 3;
+      for (const line of lines.slice(0, maxLines)) {
+        error(line);
+      }
+      if (!process.env.DEBUG && lines.length > maxLines) {
+        error(`  ... ${lines.length - maxLines} more lines (set DEBUG=1 for full output)`);
+      }
+    }
+    error(`Try manually: ${pm} add ${deps.join(" ")}`);
+    return false;
+  }
 }
 
 export function getInstalledDeps(cwd: string): Set<string> {
