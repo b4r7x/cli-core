@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 const DEFAULT_PEER_DEPS = new Set<string>();
 const DEFAULT_ALIAS_PREFIXES = ["@/", "./", "../", "node:"];
 
