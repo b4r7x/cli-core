@@ -7,6 +7,9 @@ import { detectSourceDir } from "./detect.js";
 
 export const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
 
+/** Reusable Zod schema for alias path fields (e.g., `"@/hooks"`, `"./lib"`). */
+export const aliasPathSchema = z.string().regex(ALIAS_PATTERN, 'Must start with "@/" or a relative path').optional();
+
 export function aliasToFsPath(alias: string, sourceDir?: string): string {
   const stripped = alias.replace(/^@\//, "");
   return sourceDir && sourceDir !== "." ? `${sourceDir}/${stripped}` : stripped;

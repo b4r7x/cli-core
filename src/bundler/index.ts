@@ -122,7 +122,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     const integrity = "sha256-" + createHash("sha256").update(contentForHash).digest("hex");
 
     // Write bundle atomically
-    const bundle = { items, ...extra, integrity };
+    const bundle = { schemaVersion: 1, items, ...extra, integrity };
     const bundleJson = JSON.stringify(bundle);
 
     mkdirSync(dirname(outputPath), { recursive: true });

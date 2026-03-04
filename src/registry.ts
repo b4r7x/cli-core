@@ -38,6 +38,18 @@ export const RegistryContentItemSchema = RegistryItemSchema.extend({
 export type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
 export type RegistryContentItem = z.infer<typeof RegistryContentItemSchema>;
 
+/**
+ * Base schema for registry bundles. Contains items + integrity.
+ * Consumer CLIs can extend with `.extend()` for additional fields (e.g., theme, styles).
+ */
+export const BaseRegistryBundleSchema = z.object({
+  schemaVersion: z.number().optional(),
+  items: z.array(RegistryContentItemSchema),
+  integrity: z.string().optional(),
+});
+
+export type BaseRegistryBundle = z.infer<typeof BaseRegistryBundleSchema>;
+
 export type ParsedRegistryDependencyRef =
   | { kind: "local"; raw: string; name: string }
   | { kind: "namespace"; raw: string; namespace: string; name: string };
@@ -122,11 +134,13 @@ export function collectNpmDeps(
   return [...deps];
 }
 
+const CURRENT_SCHEMA_VERSION = 1;
+
 /**
  * Factory that creates a cached, integrity-checked registry bundle loader.
  * Eliminates the boilerplate of loading → parsing → validating → integrity-checking.
  */
-export function createRegistryLoader<TBundle extends { integrity?: string }>(
+export function createRegistryLoader<TBundle extends { integrity?: string; schemaVersion?: number }>(
   bundlePath: string,
   bundleSchema: z.ZodType<TBundle>,
   integrityContent: (bundle: TBundle) => unknown,
@@ -153,6 +167,13 @@ export function createRegistryLoader<TBundle extends { integrity?: string }>(
     }
 
     const bundle = bundleSchema.parse(raw);
+
+    if (bundle.schemaVersion !== undefined && bundle.schemaVersion > CURRENT_SCHEMA_VERSION) {
+      throw new Error(
+        `Registry bundle schema version ${bundle.schemaVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}. ` +
+        `Update this CLI to the latest version.`,
+      );
+    }
 
     if (bundle.integrity) {
       const content = JSON.stringify(integrityContent(bundle));
