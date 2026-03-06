@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import pc from "picocolors";
 import { createTwoFilesPatch } from "diff";
-import { heading, info, newline } from "../logger.js";
+import { heading, info, isSilentMode, newline } from "../logger.js";
 
 export interface DiffWorkflowFile {
   itemName: string;
@@ -18,6 +18,7 @@ export function renderDiffPatch(ctx: {
   localContent: string;
   registryContent: string;
 }): void {
+  if (isSilentMode()) return;
   const { file, localContent, registryContent } = ctx;
   heading(`${file.itemName}/${file.relativePath}`);
   const patch = createTwoFilesPatch(
