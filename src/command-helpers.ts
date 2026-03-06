@@ -142,3 +142,30 @@ export function createInstallChecker(options: {
     });
   };
 }
+
+export interface CreateItemAccessorsOptions<TConfig, TItem extends RegistryItem = RegistryItem> {
+  configFileName: string;
+  initCommand: string;
+  itemLabel: string;
+  listCommand: string;
+  loadResolved: (cwd: string) => ConfigLoadResult<TConfig>;
+  getItem: (name: string) => TItem | undefined;
+}
+
+export function createItemAccessors<TConfig, TItem extends RegistryItem = RegistryItem>(options: CreateItemAccessorsOptions<TConfig, TItem>) {
+  const requireConfig = createRequireConfig({
+    configFileName: options.configFileName,
+    initCommand: options.initCommand,
+    loadResolved: options.loadResolved,
+  });
+
+  function getOrThrow(name: string): TItem {
+    return getItemOrThrow(name, options.getItem, options.itemLabel, options.listCommand);
+  }
+
+  function validate(names: string[]): void {
+    validateItems(names, options.getItem, options.itemLabel, options.listCommand);
+  }
+
+  return { requireConfig, getOrThrow, validate };
+}
