@@ -1,5 +1,6 @@
 node_modules/
 dist/
+coverage/
 
 # spec-kit — only constitution and specs are tracked
 .specify/scripts/
