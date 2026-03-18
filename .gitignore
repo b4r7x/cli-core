@@ -1,2 +1,7 @@
 node_modules/
 dist/
+
+# spec-kit — only constitution and specs are tracked
+.specify/scripts/
+.specify/templates/
+.specify/init-options.json
