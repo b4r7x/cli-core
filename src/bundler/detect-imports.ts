@@ -21,11 +21,11 @@ export function detectNpmImports(
     const match = /from\s+["']([^"']+)["']/.exec(line);
     if (!match) continue;
 
-    const pkg = match[1]!;
-    if (aliasPrefixes.some((p) => pkg.startsWith(p))) continue;
+    const pkg = match[1];
+    if (!pkg || aliasPrefixes.some((p) => pkg.startsWith(p))) continue;
 
     const parts = pkg.split("/");
-    const pkgName = pkg.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]!;
+    const pkgName = pkg.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0];
     if (!peerDeps.has(pkgName)) imports.push(pkgName);
   }
 

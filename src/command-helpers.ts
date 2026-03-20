@@ -15,10 +15,6 @@ export function withErrorHandler<TArgs extends unknown[]>(fn: (...args: TArgs) =
   };
 }
 
-/**
- * Factory that creates a `requireConfig(cwd)` function for a CLI.
- * Throws user-friendly errors when config is missing or malformed.
- */
 export function createRequireConfig<TRaw, TResolved>(options: {
   configFileName: string;
   initCommand: string;
@@ -36,9 +32,6 @@ export function createRequireConfig<TRaw, TResolved>(options: {
   };
 }
 
-/**
- * Returns the registry item or throws a user-friendly error.
- */
 export function getItemOrThrow<T extends RegistryItem>(
   name: string,
   getItem: (name: string) => T | undefined,
@@ -52,9 +45,6 @@ export function getItemOrThrow<T extends RegistryItem>(
   return item;
 }
 
-/**
- * Validates that all names exist in the registry. Collects all missing items and reports them at once.
- */
 export function validateItems<T extends RegistryItem>(
   names: string[],
   getItem: (name: string) => T | undefined,
@@ -69,10 +59,6 @@ export function validateItems<T extends RegistryItem>(
   }
 }
 
-/**
- * Strips known path prefixes from a registry file path.
- * Tries each prefix in order and returns the path with the first match removed.
- */
 export function getRelativePath(
   file: { path: string; targetPath?: string },
   prefixes: string[],
@@ -90,10 +76,6 @@ export function getRelativePath(
   );
 }
 
-/**
- * Validates a CLI option value against an enum of allowed values.
- * Returns the value if valid, throws a user-friendly error otherwise.
- */
 export function parseEnumOption<T extends string>(
   value: string,
   validValues: readonly T[],
@@ -107,11 +89,6 @@ export function parseEnumOption<T extends string>(
   return value as T;
 }
 
-/**
- * Checks for installed items by name. Looks up manifest first, then falls back to
- * filesystem detection. Filesystem check tries: exact path, path with each extension
- * (.tsx, .ts, .jsx, .js), and path/index with each extension (for directory-style modules).
- */
 export function createInstallChecker(options: {
   getManifest: () => Record<string, unknown> | undefined;
   getItem: (name: string) => RegistryItem | undefined;

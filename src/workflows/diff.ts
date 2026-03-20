@@ -10,9 +10,6 @@ export interface DiffWorkflowFile {
   registryContent: string;
 }
 
-/**
- * Renders a colorized unified diff patch to stdout.
- */
 export function renderDiffPatch(ctx: {
   file: DiffWorkflowFile;
   localContent: string;

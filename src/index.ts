@@ -16,7 +16,6 @@ export * from "./workflows/init.js";
 export * from "./command-factories.js";
 export type { ApplyInstallPlanOptions } from "./workflows/apply-install-plan.js";
 
-// Re-export common dependencies so consumers don't need to declare them directly
 export { Command } from "commander";
 export { z } from "zod";
 export { default as pc } from "picocolors";

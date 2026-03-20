@@ -65,13 +65,10 @@ export function cleanEmptyDirs(dirs: string[]): void {
       if (existsSync(dir) && readdirSync(dir).length === 0) {
         rmSync(dir, { recursive: true });
       }
-    } catch {
-      // May already be cleaned up
-    }
+    } catch {}
   }
 }
 
-/** Reads tsconfig.json or jsconfig.json and returns the `compilerOptions.paths` record, or null. */
 export function readTsConfigPaths(cwd: string): Record<string, string[]> | null {
   for (const configFile of ["tsconfig.json", "jsconfig.json"]) {
     try {
@@ -79,9 +76,7 @@ export function readTsConfigPaths(cwd: string): Record<string, string[]> | null 
       const config = JSON.parse(stripJsonComments(raw));
       const paths = config.compilerOptions?.paths;
       if (paths && typeof paths === "object") return paths;
-    } catch {
-      // Ignore missing/unreadable config files
-    }
+    } catch {}
   }
   return null;
 }
@@ -114,13 +109,6 @@ export function writeFileSafe(
   return exists ? "overwritten" : "written";
 }
 
-/**
- * Copies a generated directory from src to dist after TypeScript compilation.
- *
- * @param pkgRoot - Absolute path to the package root directory.
- * @param srcRelative - Relative path from pkgRoot to the source generated dir (e.g. "src/cli/generated").
- * @param distRelative - Relative path from pkgRoot to the dist generated dir (e.g. "dist/cli/generated").
- */
 export function copyGeneratedDir(
   pkgRoot: string,
   srcRelative: string,

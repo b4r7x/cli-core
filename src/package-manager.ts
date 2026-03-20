@@ -8,7 +8,6 @@ import { warn, error, toErrorMessage, isSilentMode } from "./logger.js";
 const VALID_PKG_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
 const VERSION_SPEC_PATTERN = /^[a-zA-Z0-9._\-~/^*@:+]+$/;
 
-/** Strips the version specifier from a dependency string (e.g. `foo@^1.0` → `foo`). */
 export function depName(dep: string): string {
   if (!dep.includes("@")) return dep;
   const searchFrom = dep.startsWith("@") ? dep.indexOf("/") + 1 : 0;
@@ -16,7 +15,6 @@ export function depName(dep: string): string {
   return versionAt > 0 ? dep.slice(0, versionAt) : dep;
 }
 
-/** Validates and normalises a version spec (semver, range, or dist tag). */
 export function normalizeVersionSpec(raw: unknown, packageName = "package"): string {
   const spec = String(raw ?? "latest").trim();
   if (spec.length === 0) {

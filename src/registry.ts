@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { toErrorMessage } from "./logger.js";
+import { getRelativePath } from "./command-helpers.js";
 
 export const RegistryFileSchema = z.object({
   path: z.string().refine(
@@ -38,10 +39,6 @@ export const RegistryContentItemSchema = RegistryItemSchema.extend({
 export type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
 export type RegistryContentItem = z.infer<typeof RegistryContentItemSchema>;
 
-/**
- * Base schema for registry bundles. Contains items + integrity.
- * Consumer CLIs can extend with `.extend()` for additional fields (e.g., theme, styles).
- */
 export const BaseRegistryBundleSchema = z.object({
   schemaVersion: z.number().optional(),
   items: z.array(RegistryContentItemSchema),
@@ -56,11 +53,6 @@ export type ParsedRegistryDependencyRef =
 
 const NAMESPACE_REF_RE = /^(@[a-z0-9][\w-]*)\/([a-z0-9][\w-]*)$/i;
 
-/**
- * Parses a registry dependency ref into one of:
- * - local item name (e.g. "controllable-state")
- * - namespaced ref (e.g. "@yourlib/item-name")
- */
 export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependencyRef {
   const raw = ref.trim();
   if (raw.length === 0) {
@@ -136,10 +128,6 @@ export function collectNpmDeps(
 
 const CURRENT_SCHEMA_VERSION = 1;
 
-/**
- * Factory that creates a cached, integrity-checked registry bundle loader.
- * Eliminates the boilerplate of loading → parsing → validating → integrity-checking.
- */
 export function createRegistryLoader<TBundle extends { integrity?: string; schemaVersion?: number }>(
   bundlePath: string,
   bundleSchema: z.ZodType<TBundle>,
@@ -191,10 +179,49 @@ export function createRegistryLoader<TBundle extends { integrity?: string; schem
   };
 }
 
-/**
- * Type-safe accessor for fields stored in a registry item's `meta` object.
- */
 export function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
   const val = item.meta?.[key];
   return val !== undefined ? (val as T) : fallback;
+}
+
+export interface CreateRegistryAccessorsOptions {
+  loader: () => { items: RegistryContentItem[] };
+  itemLabel: string;
+  pathPrefixes: string[];
+  itemTypeFilter?: string;
+}
+
+export interface RegistryAccessors {
+  getItem: (name: string) => RegistryContentItem | undefined;
+  getPublicItems: () => RegistryContentItem[];
+  getAllItems: () => RegistryContentItem[];
+  resolveDeps: (names: string[]) => string[];
+  relativePath: (file: { path: string; targetPath?: string }) => string;
+  npmDeps: (names: string[]) => string[];
+}
+
+export function createRegistryAccessors(options: CreateRegistryAccessorsOptions): RegistryAccessors {
+  const { loader, itemLabel, pathPrefixes, itemTypeFilter } = options;
+
+  function getItem(name: string): RegistryContentItem | undefined {
+    return loader().items.find((item) => item.name === name);
+  }
+
+  function getAllItems(): RegistryContentItem[] {
+    const items = loader().items;
+    return itemTypeFilter ? items.filter((item) => item.type === itemTypeFilter) : items;
+  }
+
+  function getPublicItems(): RegistryContentItem[] {
+    return getAllItems().filter((item) => !metaField(item, "hidden", false));
+  }
+
+  return {
+    getItem,
+    getPublicItems,
+    getAllItems,
+    resolveDeps: (names) => resolveRegistryDeps(names, getItem, itemLabel),
+    relativePath: (file) => getRelativePath(file, pathPrefixes),
+    npmDeps: (names) => collectNpmDeps(names, getItem),
+  };
 }

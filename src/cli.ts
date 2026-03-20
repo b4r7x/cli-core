@@ -43,7 +43,6 @@ export function createCli(options: CliOptions): Command {
     program.addCommand(cmd);
   }
 
-  // Interactive menu when no subcommand is provided
   if (options.menuItems && options.menuItems.length > 0) {
     const menuItems = options.menuItems;
     const commandMap = new Map(options.commands.map((cmd) => [cmd.name(), cmd]));

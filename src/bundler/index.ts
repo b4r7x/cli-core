@@ -31,7 +31,6 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
 
     info("Bundling registry...");
 
-    // Load and validate registry.json
     const registryPath = resolve(rootDir, "registry/registry.json");
     if (!existsSync(registryPath)) {
       throw new Error(`registry.json not found at ${registryPath}.`);
@@ -52,7 +51,6 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
 
     const { items: sourceItems } = parsed.data;
 
-    // Check for duplicate names
     const names = new Set<string>();
     for (const item of sourceItems) {
       if (names.has(item.name)) {
@@ -61,18 +59,16 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       names.add(item.name);
     }
 
-    // Validate local registry dependencies exist (namespace refs are cross-registry)
     for (const item of sourceItems) {
       for (const dep of item.registryDependencies) {
-        const parsed = parseRegistryDependencyRef(dep);
-        if (parsed.kind !== "local") continue;
-        if (!names.has(parsed.name)) {
+        const depRef = parseRegistryDependencyRef(dep);
+        if (depRef.kind !== "local") continue;
+        if (!names.has(depRef.name)) {
           throw new Error(`"${item.name}" has registryDependency "${dep}" which doesn't exist`);
         }
       }
     }
 
-    // Build bundle items
     const items: BundleItem[] = [];
 
     for (const item of sourceItems) {
@@ -114,14 +110,11 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       });
     }
 
-    // Extra content (theme, styles, etc.)
     const extra = extraContent ? extraContent(rootDir) : {};
 
-    // Compute integrity hash
     const contentForHash = JSON.stringify({ items, ...extra });
     const integrity = "sha256-" + createHash("sha256").update(contentForHash).digest("hex");
 
-    // Write bundle atomically
     const bundle = { schemaVersion: 1, items, ...extra, integrity };
     const bundleJson = JSON.stringify(bundle);
 
@@ -130,7 +123,6 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     writeFileSync(tmpPath, bundleJson);
     renameSync(tmpPath, outputPath);
 
-    // Summary
     const totalFiles = items.reduce((acc, i) => acc + i.files.length, 0);
     const sizeKb = (Buffer.byteLength(bundleJson) / 1024).toFixed(1);
 

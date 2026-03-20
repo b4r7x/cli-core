@@ -135,9 +135,6 @@ export function formatWriteSummary(result: WriteFilesResult): string {
   return `Done. ${parts.join(", ")}.`;
 }
 
-/**
- * Installs missing npm dependencies with a spinner, rolling back written files on failure.
- */
 export async function installDepsWithRollback(
   deps: string[],
   cwd: string,

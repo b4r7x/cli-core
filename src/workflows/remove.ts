@@ -17,10 +17,6 @@ export interface RemoveWorkflowFile {
   absolutePath: string;
 }
 
-/**
- * Finds npm dependencies that are no longer needed after removing registry items.
- * Generic helper — pass item accessors for the specific registry type.
- */
 export function findOrphanedNpmDeps<TItem>(opts: {
   removedNames: string[];
   getAllItems: () => TItem[];

@@ -7,7 +7,6 @@ import { detectSourceDir } from "./detect.js";
 
 export const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
 
-/** Reusable Zod schema for alias path fields (e.g., `"@/hooks"`, `"./lib"`). */
 export const aliasPathSchema = z.string().regex(ALIAS_PATTERN, 'Must start with "@/" or a relative path').optional();
 
 export function aliasToFsPath(alias: string, sourceDir?: string): string {
@@ -40,7 +39,7 @@ export function loadJsonConfig<T>(
   }
 
   try {
-    const config = schema.parse(parsed) as T;
+    const config = schema.parse(parsed);
     return { ok: true, config };
   } catch (e) {
     if (e instanceof z.ZodError) {
@@ -61,6 +60,19 @@ export function writeJsonConfig(configFileName: string, data: unknown, cwd: stri
     try { rmSync(tmpPath); } catch {}
     throw new Error(`Failed to write config to ${configPath}: ${toErrorMessage(e)}`);
   }
+}
+
+export function resolveAliasedPaths<K extends string>(
+  rawPaths: Record<K, string | undefined>,
+  aliases: Record<K, string>,
+  cwd?: string,
+): Record<K, string> {
+  const sourceDir = cwd ? detectSourceDir(cwd) : ".";
+  const result = {} as Record<K, string>;
+  for (const key of Object.keys(rawPaths) as K[]) {
+    result[key] = rawPaths[key] ?? aliasToFsPath(aliases[key], sourceDir);
+  }
+  return result;
 }
 
 export function updateManifest<T extends Record<string, unknown>>(

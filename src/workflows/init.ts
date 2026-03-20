@@ -5,41 +5,18 @@ import type { ConfigLoadResult } from "../config.js";
 import pc from "picocolors";
 
 export interface InitWorkflowOptions<TConfig> {
-  /** Working directory */
   cwd: string;
-
-  /** Config file name (e.g., "mylib.json") */
   configFileName: string;
-
-  /** Skip confirmation prompts */
   yes: boolean;
-
-  /** Overwrite existing configuration */
   force: boolean;
-
-  /** Load existing config to check if already initialized */
   loadConfig: (cwd: string) => ConfigLoadResult<TConfig>;
-
-  /** Detect project environment and return display lines */
   detectProject: (cwd: string) => { display: Array<[label: string, value: string]> };
-
-  /** Create directories and additional files. Return created paths for display */
   createFiles: (cwd: string) => Array<{ action: "created" | "skipped"; path: string }>;
-
-  /** Optional async step after file creation (e.g., installing deps) */
   afterFiles?: (cwd: string) => Promise<void>;
-
-  /** Write the config file */
   writeConfig: (cwd: string) => void | Promise<void>;
-
-  /** Message shown after success (e.g., "Add items with: npx mylib add <item>") */
   nextSteps: string[];
 }
 
-/**
- * Generic init workflow for registry-based CLIs.
- * Handles: package.json check, existing config detection, env display, confirmation, file creation, config writing.
- */
 export async function runInitWorkflow<TConfig>(options: InitWorkflowOptions<TConfig>): Promise<void> {
   const { cwd, configFileName, yes, force, loadConfig, detectProject, createFiles, afterFiles, writeConfig, nextSteps } = options;
 

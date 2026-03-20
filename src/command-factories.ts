@@ -5,8 +5,6 @@ import { runListWorkflow, type ListDisplayItem } from "./workflows/list.js";
 import { runDiffWorkflow, renderDiffPatch, type DiffWorkflowFile } from "./workflows/diff.js";
 import { runRemoveWorkflow, type RemoveWorkflowFile } from "./workflows/remove.js";
 
-// ─── List ───────────────────────────────────────────────────────────────────
-
 export interface ListCommandConfig<TItem extends { name: string }, TConfig> {
   itemPlural: string;
   getAllItems: () => TItem[];
@@ -47,8 +45,6 @@ export function createListCommand<TItem extends { name: string }, TConfig>(
     }));
 }
 
-// ─── Diff ───────────────────────────────────────────────────────────────────
-
 export interface DiffCommandConfig<TConfig> {
   itemPlural: string;
   requireConfig: (cwd: string) => TConfig;
@@ -83,8 +79,6 @@ export function createDiffCommand<TConfig>(
       });
     }));
 }
-
-// ─── Remove ─────────────────────────────────────────────────────────────────
 
 export interface RemoveCommandConfig<TItem, TConfig> {
   itemPlural: string;
