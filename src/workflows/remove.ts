@@ -24,17 +24,18 @@ export function findOrphanedNpmDeps<TItem>(opts: {
   getItemDeps: (item: TItem) => string[];
   isInstalled: (item: TItem) => boolean;
 }): string[] {
+  const allItems = opts.getAllItems();
+  const removedSet = new Set(opts.removedNames);
   const removedDeps = new Set(
     opts.removedNames.flatMap((n) => {
-      const item = opts.getAllItems().find((i) => opts.getItemName(i) === n);
+      const item = allItems.find((i) => opts.getItemName(i) === n);
       return item ? opts.getItemDeps(item) : [];
     }),
   );
   if (removedDeps.size === 0) return [];
 
-  const removedSet = new Set(opts.removedNames);
   const remainingDeps = new Set(
-    opts.getAllItems()
+    allItems
       .filter((i) => !removedSet.has(opts.getItemName(i)) && opts.isInstalled(i))
       .flatMap((i) => opts.getItemDeps(i)),
   );

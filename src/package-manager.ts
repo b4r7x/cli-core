@@ -1,9 +1,8 @@
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { PackageManager } from "./detect.js";
+import { readPackageJson } from "./detect.js";
 import * as clack from "@clack/prompts";
-import { warn, error, toErrorMessage, isSilentMode } from "./logger.js";
+import { error, toErrorMessage, isSilentMode } from "./logger.js";
 
 const VALID_PKG_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
 const VERSION_SPEC_PATTERN = /^[a-zA-Z0-9._\-~/^*@:+]+$/;
@@ -33,10 +32,7 @@ export function normalizeVersionSpec(raw: unknown, packageName = "package"): str
 
 function validatePackageNames(deps: string[]): void {
   for (const dep of deps) {
-    const searchFrom = dep.startsWith("@") ? dep.indexOf("/") + 1 : 0;
-    const versionAt = dep.indexOf("@", searchFrom);
-    const name = versionAt > 0 ? dep.slice(0, versionAt) : dep;
-    if (!VALID_PKG_NAME.test(name)) {
+    if (!VALID_PKG_NAME.test(depName(dep))) {
       throw new Error(`Invalid package name: "${dep}"`);
     }
   }
@@ -98,15 +94,11 @@ export async function installDepsWithSpinner(
 }
 
 export function getInstalledDeps(cwd: string): Set<string> {
-  try {
-    const pkg = JSON.parse(readFileSync(resolve(cwd, "package.json"), "utf-8"));
-    return new Set([
-      ...Object.keys(pkg.dependencies || {}),
-      ...Object.keys(pkg.devDependencies || {}),
-      ...Object.keys(pkg.peerDependencies || {}),
-    ]);
-  } catch (e) {
-    warn(`Could not read package.json dependencies: ${toErrorMessage(e)}`);
-    return new Set();
-  }
+  const pkg = readPackageJson(cwd);
+  if (!pkg) return new Set();
+  return new Set([
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.devDependencies || {}),
+    ...Object.keys(pkg.peerDependencies || {}),
+  ]);
 }

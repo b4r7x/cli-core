@@ -44,13 +44,12 @@ export function createCli(options: CliOptions): Command {
   }
 
   if (options.menuItems && options.menuItems.length > 0) {
-    const menuItems = options.menuItems;
     const commandMap = new Map(options.commands.map((cmd) => [cmd.name(), cmd]));
 
     program.action(async () => {
       showBanner(options.displayName);
 
-      const value = await promptSelect("What would you like to do?", menuItems);
+      const value = await promptSelect("What would you like to do?", options.menuItems!);
       const cmd = commandMap.get(value);
       if (cmd) {
         const argv0 = process.argv[0] ?? "node";
