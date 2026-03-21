@@ -11,7 +11,6 @@ import {
   getRelativePath,
   parseEnumOption,
   createInstallChecker,
-  createItemAccessors,
 } from "../dist/command-helpers.js";
 
 test("createRequireConfig", async (t) => {
@@ -142,37 +141,3 @@ test("createInstallChecker", async (t) => {
   });
 });
 
-test("createItemAccessors", async (t) => {
-  const items = new Map([
-    ["button", { name: "button", type: "ui", title: "Button", description: "", dependencies: [], registryDependencies: [], files: [] }],
-  ]);
-
-  const accessors = createItemAccessors({
-    configFileName: "test.json",
-    initCommand: "test init",
-    itemLabel: "component",
-    listCommand: "test list",
-    loadResolved: () => ({ ok: true, config: { name: "test" } }),
-    getItem: (n) => items.get(n),
-  });
-
-  await t.test("requireConfig returns config", () => {
-    assert.deepEqual(accessors.requireConfig("/any"), { name: "test" });
-  });
-
-  await t.test("getOrThrow returns item", () => {
-    assert.equal(accessors.getOrThrow("button").name, "button");
-  });
-
-  await t.test("getOrThrow throws for missing", () => {
-    assert.throws(() => accessors.getOrThrow("missing"), /not found/);
-  });
-
-  await t.test("validate passes for existing items", () => {
-    assert.doesNotThrow(() => accessors.validate(["button"]));
-  });
-
-  await t.test("validate throws for missing items", () => {
-    assert.throws(() => accessors.validate(["missing"]), /not found/);
-  });
-});

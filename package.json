@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc",
     "type-check": "tsc --noEmit",
-    "test": "npm run build && node --test ./tests/*.test.js",
+    "test": "npm run build && node --test ./testing/*.test.js",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

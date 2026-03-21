@@ -102,19 +102,20 @@ test("runAddWorkflow", async (t) => {
     }
   });
 
-  await t.test("--all uses public names", async () => {
+  await t.test("--all writes files for all public names", async () => {
     setSilent(true);
     const tmp = createTmp();
     try {
       writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "test", packageManager: "npm@10.0.0" }));
-      let receivedNames = [];
+      const buttonPath = join(tmp, "components", "button.tsx");
+      const cardPath = join(tmp, "components", "card.tsx");
 
       await runAddWorkflow({
         cwd: tmp,
         requestedNames: [],
         all: true,
         yes: true,
-        dryRun: true,
+        dryRun: false,
         overwrite: false,
         skipInstall: true,
         itemLabel: "component",
@@ -123,13 +124,19 @@ test("runAddWorkflow", async (t) => {
         emptyRequestedMessage: "No components specified.",
         requireConfig: () => ({}),
         getPublicNames: () => ["button", "card"],
-        buildPlan: ({ names }) => {
-          receivedNames = names;
-          return { resolvedNames: names, fileOps: [], missingDeps: [], headingMessage: "Adding..." };
-        },
+        buildPlan: ({ names }) => ({
+          resolvedNames: names,
+          fileOps: [
+            { targetPath: buttonPath, content: "export const Button = () => {};", relativePath: "button.tsx", installDir: join(tmp, "components") },
+            { targetPath: cardPath, content: "export const Card = () => {};", relativePath: "card.tsx", installDir: join(tmp, "components") },
+          ],
+          missingDeps: [],
+          headingMessage: "Adding...",
+        }),
       });
 
-      assert.deepEqual(receivedNames, ["button", "card"]);
+      assert.equal(readFileSync(buttonPath, "utf-8"), "export const Button = () => {};");
+      assert.equal(readFileSync(cardPath, "utf-8"), "export const Card = () => {};");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
       setSilent(false);

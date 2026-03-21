@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -41,7 +41,6 @@ test("runInitWorkflow", async (t) => {
     const tmp = createTmp();
     try {
       writeFileSync(join(tmp, "package.json"), "{}");
-      let writeConfigCalled = false;
 
       await runInitWorkflow({
         cwd: tmp,
@@ -51,11 +50,11 @@ test("runInitWorkflow", async (t) => {
         loadConfig: () => ({ ok: true, config: {} }),
         detectProject: () => ({ display: [] }),
         createFiles: () => [],
-        writeConfig: () => { writeConfigCalled = true; },
+        writeConfig: (dir) => { writeFileSync(join(dir, "test.json"), "{}"); },
         nextSteps: [],
       });
 
-      assert.equal(writeConfigCalled, false);
+      assert.equal(existsSync(join(tmp, "test.json")), false);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
       setSilent(false);
@@ -67,7 +66,6 @@ test("runInitWorkflow", async (t) => {
     const tmp = createTmp();
     try {
       writeFileSync(join(tmp, "package.json"), "{}");
-      let writeConfigCalled = false;
 
       await runInitWorkflow({
         cwd: tmp,
@@ -77,11 +75,11 @@ test("runInitWorkflow", async (t) => {
         loadConfig: () => ({ ok: true, config: {} }),
         detectProject: () => ({ display: [["Framework", "React"]] }),
         createFiles: () => [{ action: "created", path: "theme.css" }],
-        writeConfig: () => { writeConfigCalled = true; },
+        writeConfig: (dir) => { writeFileSync(join(dir, "test.json"), "{}"); },
         nextSteps: ["Run add command"],
       });
 
-      assert.equal(writeConfigCalled, true);
+      assert.equal(existsSync(join(tmp, "test.json")), true);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
       setSilent(false);

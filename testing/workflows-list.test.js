@@ -16,31 +16,25 @@ function toDisplayItem(item) {
 }
 
 test("runListWorkflow", async (t) => {
-  await t.test("outputs JSON when json=true", () => {
-    const logs = [];
-    const origLog = console.log;
-    console.log = (...args) => logs.push(args.join(" "));
+  await t.test("outputs JSON when json=true", (t) => {
+    const mock = t.mock.method(console, "log");
 
-    try {
-      runListWorkflow({
-        cwd: "/tmp",
-        includeAll: false,
-        installedOnly: false,
-        json: true,
-        itemPlural: "components",
-        getAllItems: makeItems,
-        getPublicItems: makeItems,
-        requireConfig: () => ({}),
-        isInstalled: () => false,
-        toDisplayItem,
-      });
+    runListWorkflow({
+      cwd: "/tmp",
+      includeAll: false,
+      installedOnly: false,
+      json: true,
+      itemPlural: "components",
+      getAllItems: makeItems,
+      getPublicItems: makeItems,
+      requireConfig: () => ({}),
+      isInstalled: () => false,
+      toDisplayItem,
+    });
 
-      const output = JSON.parse(logs.join(""));
-      assert.equal(output.length, 2);
-      assert.equal(output[0].name, "button");
-    } finally {
-      console.log = origLog;
-    }
+    const output = JSON.parse(mock.mock.calls[0].arguments[0]);
+    assert.equal(output.length, 2);
+    assert.equal(output[0].name, "button");
   });
 
   await t.test("filters to installed only", () => {
