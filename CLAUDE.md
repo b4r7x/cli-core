@@ -7,11 +7,20 @@ Shared CLI framework for building registry-based CLIs (shadcn-style). Published 
 ### CLI Framework
 - `createCli(options)` / `runCli(program)` — entry point with banner, interactive menu, error handling
 - `Command` (re-exported from `commander`) — command definitions
-- `z` (re-exported from `zod`) — schema validation
-- `pc` (re-exported from `picocolors`) — terminal colors
+
+### Command Factories
+All 5 standard commands have factories that handle option registration, argument parsing, error handling, and workflow delegation:
+- `createInitCommand` — project initialization with config, file scaffolding, and post-setup hooks
+- `createAddCommand` — install registry items with dependency resolution, rollback, and dry-run
+- `createListCommand` — show available/installed items with JSON output option
+- `createDiffCommand` — compare local files vs registry versions
+- `createRemoveCommand` — uninstall items, cleanup orphan deps
+
+Consumers provide only domain-specific callbacks (config schema, path resolution, file transforms). Standard options (`--cwd`, `--yes`, `--dry-run`, `--overwrite`, `--skip-install`) are injected by factories.
 
 ### Generic Workflows
 Standardized, reusable workflows that both `keyscope` and `diff-ui` CLIs delegate to:
+- `runInitWorkflow` — detect project settings, create config/files, install deps
 - `runListWorkflow` — show available/installed items (`--all`, `--installed-only`, `--json`)
 - `runAddWorkflow` — install registry items with dependency resolution (`--all`, `--yes`, `--dry-run`, `--overwrite`)
 - `runDiffWorkflow` — compare local files vs registry versions
@@ -48,23 +57,25 @@ Standardized, reusable workflows that both `keyscope` and `diff-ui` CLIs delegat
 
 ```
 src/
-├── index.ts              # barrel exports
+├── index.ts              # barrel exports (~38 public exports)
 ├── cli.ts                # createCli, runCli
-├── registry.ts           # types, loader, dependency resolution
-├── config.ts             # JSON config I/O
-├── command-helpers.ts    # withErrorHandler, createRequireConfig, getItemOrThrow
+├── command-factories.ts  # createInitCommand, createAddCommand, createListCommand, createDiffCommand, createRemoveCommand
+├── command-helpers.ts    # withErrorHandler, createItemAccessors, createInstallChecker, parseEnumOption
+├── registry.ts           # types, loader, dependency resolution, accessors
+├── config.ts             # JSON config I/O, createConfigModule
 ├── logger.ts             # output + prompts
 ├── detect.ts             # package manager, source dir
 ├── package-manager.ts    # npm install utilities
 ├── add-helpers.ts        # file writing with rollback
+├── fs.ts                 # filesystem utilities
+├── integrity.ts          # SHA-256 integrity computation
 ├── bundler/              # registry bundler
 │   ├── index.ts          # createBundler entry point
 │   ├── types.ts          # bundler types
 │   ├── schemas.ts        # bundler schemas
 │   └── detect-imports.ts # detectNpmImports
-├── fs.ts                 # filesystem utilities
 └── workflows/
-    ├── init.ts           # (planned) generic init workflow
+    ├── init.ts           # generic init workflow
     ├── list.ts           # list items
     ├── add.ts            # add items
     ├── diff.ts           # show diffs

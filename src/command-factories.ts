@@ -15,26 +15,45 @@ export interface ExtraOption {
 
 type ParsedOpts = Record<string, unknown>;
 
+const resolveCwd = (opts: ParsedOpts) => resolve(String(opts.cwd));
+
 function addExtraOptions(cmd: Command, extras: ExtraOption[] | undefined): void {
   for (const opt of extras ?? []) {
     cmd.option(opt.flags, opt.description, opt.default);
   }
 }
 
-export interface ListCommandConfig<TItem extends { name: string }, TConfig> {
+interface RegistryLikeItem {
+  name: string;
+  title: string;
+  description: string;
+  dependencies: string[];
+  files: Array<{ path: string; targetPath?: string }>;
+}
+
+export interface ListCommandConfig<TItem extends RegistryLikeItem, TConfig> {
   itemPlural: string;
   getAllItems: () => TItem[];
   getPublicItems: () => TItem[];
   requireConfig: (cwd: string) => TConfig;
   createInstallChecker: (cwd: string, config: TConfig) => (name: string) => boolean;
-  toDisplayItem: (item: TItem) => ListDisplayItem;
+  getRelativePath: (file: { path: string; targetPath?: string }) => string;
+  toDisplayItem?: (item: TItem) => ListDisplayItem;
 }
 
-function buildListAction<TItem extends { name: string }, TConfig>(
+function buildListAction<TItem extends RegistryLikeItem, TConfig>(
   config: ListCommandConfig<TItem, TConfig>,
 ) {
+  const toDisplay = config.toDisplayItem ?? ((item: TItem): ListDisplayItem => ({
+    name: item.name,
+    title: item.title,
+    description: item.description,
+    dependencies: item.dependencies,
+    files: item.files.map((file) => config.getRelativePath(file)),
+  }));
+
   return withErrorHandler(async (opts: ParsedOpts) => {
-    const cwd = resolve(String(opts.cwd));
+    const cwd = resolveCwd(opts);
     let checker: ((name: string) => boolean) | undefined;
 
     runListWorkflow({
@@ -50,12 +69,12 @@ function buildListAction<TItem extends { name: string }, TConfig>(
         checker ??= config.createInstallChecker(cwd, cfg);
         return checker(item.name);
       },
-      toDisplayItem: config.toDisplayItem,
+      toDisplayItem: toDisplay,
     });
   });
 }
 
-export function createListCommand<TItem extends { name: string }, TConfig>(
+export function createListCommand<TItem extends RegistryLikeItem, TConfig>(
   config: ListCommandConfig<TItem, TConfig>,
 ): Command {
   return new Command("list")
@@ -79,7 +98,7 @@ export interface DiffCommandConfig<TConfig> {
 
 function buildDiffAction<TConfig>(config: DiffCommandConfig<TConfig>) {
   return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
-    const cwd = resolve(String(opts.cwd));
+    const cwd = resolveCwd(opts);
 
     runDiffWorkflow({
       cwd,
@@ -124,7 +143,7 @@ function buildRemoveAction<TItem, TConfig>(
   config: RemoveCommandConfig<TItem, TConfig>,
 ) {
   return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
-    const cwd = resolve(String(opts.cwd));
+    const cwd = resolveCwd(opts);
 
     await runRemoveWorkflow({
       cwd,
@@ -171,7 +190,7 @@ export interface InitCommandConfig<TConfig> {
 
 function buildInitAction<TConfig>(config: InitCommandConfig<TConfig>) {
   return withErrorHandler(async (opts: ParsedOpts) => {
-    const cwd = resolve(String(opts.cwd));
+    const cwd = resolveCwd(opts);
     await runInitWorkflow({
       cwd,
       yes: Boolean(opts.yes),
@@ -222,7 +241,7 @@ export interface AddCommandConfig<TConfig> {
 
 function buildAddAction<TConfig>(config: AddCommandConfig<TConfig>) {
   return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
-    const cwd = resolve(String(opts.cwd));
+    const cwd = resolveCwd(opts);
     await runAddWorkflow({
       cwd,
       requestedNames: names,

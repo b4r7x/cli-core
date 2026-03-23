@@ -25,7 +25,6 @@ const RegistryItemSchema = z.object({
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 
-type RegistryFile = z.infer<typeof RegistryFileSchema>;
 export type RegistryItem = z.infer<typeof RegistryItemSchema>;
 
 export const RegistryContentFileSchema = RegistryFileSchema.extend({
@@ -36,7 +35,6 @@ export const RegistryContentItemSchema = RegistryItemSchema.extend({
   files: z.array(RegistryContentFileSchema),
 });
 
-type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
 export type RegistryContentItem = z.infer<typeof RegistryContentItemSchema>;
 
 export const BaseRegistryBundleSchema = z.object({
@@ -205,7 +203,7 @@ interface CreateRegistryAccessorsOptions {
   itemTypeFilter?: string;
 }
 
-interface RegistryAccessors {
+export interface RegistryAccessors {
   getItem: (name: string) => RegistryContentItem | undefined;
   getPublicItems: () => RegistryContentItem[];
   getAllItems: () => RegistryContentItem[];

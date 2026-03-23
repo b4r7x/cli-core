@@ -24,6 +24,7 @@ export {
   BaseRegistryBundleSchema, RegistryContentFileSchema, RegistryContentItemSchema,
   createRegistryLoader, createRegistryAccessors,
   metaField, parseRegistryDependencyRef,
+  type RegistryItem, type RegistryContentItem, type RegistryAccessors,
 } from "./registry.js";
 
 // Workflows (only publicly-useful utilities)
@@ -47,5 +48,4 @@ export { info, warn, heading, promptSelect } from "./logger.js";
 // Bundler
 export { createBundler } from "./bundler/index.js";
 
-// Zod re-export
-export { z } from "zod";
+
