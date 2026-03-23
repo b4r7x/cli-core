@@ -15,7 +15,7 @@ export function withErrorHandler<TArgs extends unknown[]>(fn: (...args: TArgs) =
   };
 }
 
-export function createRequireConfig<TRaw, TResolved>(options: {
+function createRequireConfig<TResolved>(options: {
   configFileName: string;
   initCommand: string;
   loadResolved: (cwd: string) => ConfigLoadResult<TResolved>;
@@ -32,7 +32,7 @@ export function createRequireConfig<TRaw, TResolved>(options: {
   };
 }
 
-export function getItemOrThrow<T extends RegistryItem>(
+function getItemOrThrow<T extends RegistryItem>(
   name: string,
   getItem: (name: string) => T | undefined,
   itemLabel: string,
@@ -45,7 +45,7 @@ export function getItemOrThrow<T extends RegistryItem>(
   return item;
 }
 
-export function validateItems<T extends RegistryItem>(
+function validateItems<T extends RegistryItem>(
   names: string[],
   getItem: (name: string) => T | undefined,
   itemLabel: string,
@@ -89,6 +89,11 @@ export function parseEnumOption<T extends string>(
   return value as T;
 }
 
+function fileExistsWithExtensions(base: string, exts: string[]): boolean {
+  if (existsSync(base)) return true;
+  return exts.some((ext) => existsSync(base + ext) || existsSync(resolve(base, `index${ext}`)));
+}
+
 export function createInstallChecker(options: {
   getManifest: () => Record<string, unknown> | undefined;
   getItem: (name: string) => RegistryItem | undefined;
@@ -106,16 +111,8 @@ export function createInstallChecker(options: {
     if (!item) return false;
 
     return item.files.some((file) => {
-      const relativePath = options.getRelativePath(file);
-      const base = resolve(options.installDir, relativePath);
-
-      if (existsSync(base)) return true;
-
-      for (const ext of exts) {
-        if (existsSync(base + ext)) return true;
-        if (existsSync(resolve(base, `index${ext}`))) return true;
-      }
-      return false;
+      const base = resolve(options.installDir, options.getRelativePath(file));
+      return fileExistsWithExtensions(base, exts);
     });
   };
 }

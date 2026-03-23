@@ -1,8 +1,6 @@
 export interface BundleFile {
   path: string;
   content: string;
-  targetPath?: string;
-  type?: string;
 }
 
 export interface BundleItem {

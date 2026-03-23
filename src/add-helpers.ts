@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import pc from "picocolors";
-import { writeFileSafe, cleanEmptyDirs } from "./fs.js";
+import { writeFileSafe, cleanEmptyDirs, type WriteResult } from "./fs.js";
 import { info, warn, heading, fileAction, toErrorMessage } from "./logger.js";
 import { detectPackageManager } from "./detect.js";
 import { installDepsWithSpinner } from "./package-manager.js";
@@ -13,34 +13,28 @@ export interface FileOp {
   installDir: string;
 }
 
+function tryQuietly(fn: () => void, label: string): boolean {
+  try {
+    fn();
+    return true;
+  } catch (err) {
+    warn(`Failed to ${label}: ${toErrorMessage(err)}`);
+    return false;
+  }
+}
+
 function rollbackFiles(
   newFiles: string[],
   backups: Array<{ path: string; content: string }>,
   createdDirs: string[],
 ): void {
-  let rollbackFailed = false;
-
-  for (const backup of backups) {
-    try {
-      writeFileSafe(backup.path, backup.content, true);
-    } catch (rollbackErr) {
-      rollbackFailed = true;
-      warn(`Failed to restore ${backup.path}: ${toErrorMessage(rollbackErr)}`);
-    }
-  }
-
-  for (const file of newFiles) {
-    try {
-      rmSync(file);
-    } catch (rollbackErr) {
-      rollbackFailed = true;
-      warn(`Failed to rollback ${file}: ${toErrorMessage(rollbackErr)}`);
-    }
-  }
-
+  const results = [
+    ...backups.map((b) => tryQuietly(() => writeFileSafe(b.path, b.content, true), `restore ${b.path}`)),
+    ...newFiles.map((f) => tryQuietly(() => rmSync(f), `rollback ${f}`)),
+  ];
   cleanEmptyDirs(createdDirs.reverse());
 
-  if (rollbackFailed) {
+  if (results.includes(false)) {
     warn("Some files could not be rolled back. Check the paths above and restore them manually.");
   }
 }
@@ -54,48 +48,59 @@ export interface WriteFilesResult {
   createdDirs: string[];
 }
 
+function trackNewDir(dir: string, existingDirs: Set<string>, createdDirs: string[]): void {
+  if (existingDirs.has(dir) || createdDirs.includes(dir)) return;
+  createdDirs.push(dir);
+}
+
+function backupIfOverwriting(targetPath: string, overwrite: boolean, backups: Array<{ path: string; content: string }>): void {
+  if (!existsSync(targetPath) || !overwrite) return;
+  backups.push({ path: targetPath, content: readFileSync(targetPath, "utf-8") });
+}
+
+function logWriteResult(result: WriteResult, op: FileOp, newFiles: string[]): void {
+  const label = `${op.installDir}/${op.relativePath}`;
+  if (result === "written") {
+    newFiles.push(op.targetPath);
+    fileAction(pc.green("+"), label);
+  } else if (result === "skipped") {
+    fileAction(pc.dim("skip"), label);
+  } else if (result === "overwritten") {
+    fileAction(pc.yellow("~"), label);
+  }
+}
+
+function countResults(results: WriteResult[]): { written: number; skipped: number; overwritten: number } {
+  let written = 0;
+  let skipped = 0;
+  let overwritten = 0;
+  for (const r of results) {
+    if (r === "written") written++;
+    else if (r === "skipped") skipped++;
+    else if (r === "overwritten") overwritten++;
+  }
+  return { written, skipped, overwritten };
+}
+
 export function writeFilesWithRollback(
   fileOps: FileOp[],
   overwrite: boolean,
 ): WriteFilesResult {
-  let written = 0;
-  let skipped = 0;
-  let overwritten = 0;
   const newFiles: string[] = [];
   const backups: Array<{ path: string; content: string }> = [];
   const existingDirs = new Set(
     fileOps.map((op) => dirname(op.targetPath)).filter((dir) => existsSync(dir)),
   );
   const createdDirs: string[] = [];
+  const results: WriteResult[] = [];
 
   try {
     for (const op of fileOps) {
-      const dir = dirname(op.targetPath);
-      if (!existingDirs.has(dir) && !createdDirs.includes(dir)) {
-        createdDirs.push(dir);
-      }
-
-      if (existsSync(op.targetPath) && overwrite) {
-        backups.push({ path: op.targetPath, content: readFileSync(op.targetPath, "utf-8") });
-      }
-
+      trackNewDir(dirname(op.targetPath), existingDirs, createdDirs);
+      backupIfOverwriting(op.targetPath, overwrite, backups);
       const result = writeFileSafe(op.targetPath, op.content, overwrite);
-
-      switch (result) {
-        case "written":
-          newFiles.push(op.targetPath);
-          fileAction(pc.green("+"), `${op.installDir}/${op.relativePath}`);
-          written++;
-          break;
-        case "skipped":
-          fileAction(pc.dim("skip"), `${op.installDir}/${op.relativePath}`);
-          skipped++;
-          break;
-        case "overwritten":
-          fileAction(pc.yellow("~"), `${op.installDir}/${op.relativePath}`);
-          overwritten++;
-          break;
-      }
+      logWriteResult(result, op, newFiles);
+      results.push(result);
     }
   } catch (e) {
     if (newFiles.length > 0 || backups.length > 0) {
@@ -105,6 +110,7 @@ export function writeFilesWithRollback(
     throw new Error(`Failed to write files: ${toErrorMessage(e)}`);
   }
 
+  const { written, skipped, overwritten } = countResults(results);
   return { written, skipped, overwritten, newFiles, backups, createdDirs };
 }
 

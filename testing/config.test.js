@@ -119,7 +119,7 @@ test("updateManifest", async (t) => {
     const tmp = createTmp();
     try {
       writeJsonConfig("cfg.json", { name: "test" }, tmp);
-      updateManifest("cfg.json", ManifestSchema, "installed", tmp, ["button", "card"]);
+      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, add: ["button", "card"] });
       const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
       assert.ok(config.installed.button);
       assert.ok(config.installed.card);
@@ -135,7 +135,7 @@ test("updateManifest", async (t) => {
     const tmp = createTmp();
     try {
       writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" }, card: { installedAt: "x" } } }, tmp);
-      updateManifest("cfg.json", ManifestSchema, "installed", tmp, undefined, ["button"]);
+      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
       const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
       assert.equal(config.installed.button, undefined);
       assert.ok(config.installed.card);
@@ -150,7 +150,7 @@ test("updateManifest", async (t) => {
     const tmp = createTmp();
     try {
       writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" } } }, tmp);
-      updateManifest("cfg.json", ManifestSchema, "installed", tmp, undefined, ["button"]);
+      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
       const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
       assert.equal(config.installed, undefined);
     } finally {

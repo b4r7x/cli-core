@@ -42,7 +42,7 @@ Standardized, reusable workflows that both `keyscope` and `diff-ui` CLIs delegat
 ### Logger
 - `info()`, `success()`, `warn()`, `error()` — respects `--silent` flag
 - `showBanner()` — figlet ASCII art
-- `promptConfirm()`, `promptSelect()`, `promptText()` — interactive prompts via @clack/prompts
+- `promptConfirm()`, `promptSelect()` — interactive prompts via @clack/prompts
 
 ## Structure
 

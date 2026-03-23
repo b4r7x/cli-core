@@ -9,55 +9,58 @@ export interface CliOptions {
   description: string;
   version: string;
   commands: Command[];
-  /** Menu items shown when CLI runs without subcommand */
   menuItems?: Array<{ value: string; label: string; hint?: string }>;
 }
 
-export function createCli(options: CliOptions): Command {
+function enforceNodeVersion(name: string): void {
   const major = parseInt(process.versions.node, 10);
   if (major < 18) {
-    console.error(`${options.name} requires Node.js >= 18. Current: ${process.version}`);
+    console.error(`${name} requires Node.js >= 18. Current: ${process.version}`);
     process.exit(1);
   }
+}
+
+function isHelpOrVersion(): boolean {
+  return (
+    process.argv.includes("--help") || process.argv.includes("-h") ||
+    process.argv.includes("--version") || process.argv.includes("-V")
+  );
+}
+
+function createPreActionHook(displayName: string) {
+  return (thisCommand: Command) => {
+    if (thisCommand.opts().silent) setSilent(true);
+    if (!process.stdout.isTTY || isHelpOrVersion()) return;
+    showBanner(displayName);
+  };
+}
+
+function attachInteractiveMenu(program: Command, options: CliOptions): void {
+  const menuItems = options.menuItems;
+  if (!menuItems?.length) return;
+
+  const commandMap = new Map(options.commands.map((cmd) => [cmd.name(), cmd]));
+  program.action(async () => {
+    showBanner(options.displayName);
+    const value = await promptSelect("What would you like to do?", menuItems);
+    if (commandMap.has(value)) {
+      await program.parseAsync([process.argv[0], process.argv[1], value]);
+    }
+  });
+}
+
+export function createCli(options: CliOptions): Command {
+  enforceNodeVersion(options.name);
 
   const program = new Command()
     .name(options.name)
     .description(options.description)
     .version(options.version)
     .option("-s, --silent", "Suppress all output except errors")
-    .hook("preAction", (thisCommand) => {
-      if (thisCommand.opts().silent) {
-        setSilent(true);
-      }
-      if (!process.stdout.isTTY) return;
-      if (
-        process.argv.includes("--help") || process.argv.includes("-h") ||
-        process.argv.includes("--version") || process.argv.includes("-V")
-      ) {
-        return;
-      }
-      showBanner(options.displayName);
-    });
+    .hook("preAction", createPreActionHook(options.displayName));
 
-  for (const cmd of options.commands) {
-    program.addCommand(cmd);
-  }
-
-  if (options.menuItems && options.menuItems.length > 0) {
-    const commandMap = new Map(options.commands.map((cmd) => [cmd.name(), cmd]));
-
-    program.action(async () => {
-      showBanner(options.displayName);
-
-      const value = await promptSelect("What would you like to do?", options.menuItems!);
-      const cmd = commandMap.get(value);
-      if (cmd) {
-        const argv0 = process.argv[0] ?? "node";
-        const argv1 = process.argv[1] ?? "";
-        await program.parseAsync([argv0, argv1, value]);
-      }
-    });
-  }
+  for (const cmd of options.commands) program.addCommand(cmd);
+  attachInteractiveMenu(program, options);
 
   return program;
 }

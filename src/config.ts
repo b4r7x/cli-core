@@ -5,11 +5,11 @@ import { z } from "zod";
 import { toErrorMessage, warn } from "./logger.js";
 import { detectSourceDir } from "./detect.js";
 
-export const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
+const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
 
 export const aliasPathSchema = z.string().regex(ALIAS_PATTERN, 'Must start with "@/" or a relative path').optional();
 
-export function aliasToFsPath(alias: string, sourceDir?: string): string {
+function aliasToFsPath(alias: string, sourceDir?: string): string {
   const stripped = alias.replace(/^@\//, "");
   return sourceDir && sourceDir !== "." ? `${sourceDir}/${stripped}` : stripped;
 }
@@ -38,9 +38,16 @@ export function loadJsonConfig<T>(
     return { ok: false, error: "parse_error", message: toErrorMessage(e) };
   }
 
+  return validateParsed(configFileName, schema, parsed);
+}
+
+function validateParsed<T>(
+  configFileName: string,
+  schema: z.ZodType<T>,
+  parsed: unknown,
+): ConfigLoadResult<T> {
   try {
-    const config = schema.parse(parsed);
-    return { ok: true, config };
+    return { ok: true, config: schema.parse(parsed) };
   } catch (e) {
     if (e instanceof z.ZodError) {
       const details = e.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
@@ -75,44 +82,97 @@ export function resolveAliasedPaths<K extends string>(
   return result;
 }
 
-export function updateManifest<T extends Record<string, unknown>>(
-  configFileName: string,
-  schema: z.ZodType<T>,
-  manifestKey: string,
-  cwd: string,
-  add?: string[],
-  remove?: string[],
-  metadata?: Record<string, unknown>,
-): void {
-  const result = loadJsonConfig(configFileName, schema, cwd);
+export function updateManifest<T extends Record<string, unknown>>(opts: {
+  configFileName: string;
+  schema: z.ZodType<T>;
+  manifestKey: string;
+  cwd: string;
+  add?: string[];
+  remove?: string[];
+  metadata?: Record<string, unknown>;
+}): void {
+  const result = loadJsonConfig(opts.configFileName, opts.schema, opts.cwd);
   if (!result.ok) {
     warn(`Could not update manifest: config not found or invalid.`);
     return;
   }
 
   const config = { ...result.config } as Record<string, unknown>;
-  const manifest = { ...(config[manifestKey] as Record<string, unknown> | undefined) };
-
-  if (add) {
-    const now = new Date().toISOString();
-    for (const name of add) {
-      manifest[name] = {
-        installedAt: now,
-        ...(metadata ?? {}),
-      };
-    }
-  }
-
-  if (remove) {
-    for (const name of remove) {
-      delete manifest[name];
-    }
-  }
+  const manifest = mutateManifest(
+    { ...(config[opts.manifestKey] as Record<string, unknown> | undefined) },
+    opts.add, opts.remove, opts.metadata,
+  );
 
   if (Object.keys(manifest).length > 0) {
-    config[manifestKey] = manifest;
+    config[opts.manifestKey] = manifest;
   } else {
-    delete config[manifestKey];
+    delete config[opts.manifestKey];
   }
-  writeJsonConfig(configFileName, config, cwd);
+  writeJsonConfig(opts.configFileName, config, opts.cwd);
+}
+
+export function createConfigModule<
+  TRaw extends Record<string, unknown>,
+  TResolved,
+  TMetadata extends Record<string, unknown> = Record<string, unknown>,
+>(opts: {
+  configFileName: string;
+  schema: z.ZodType<TRaw>;
+  resolveConfig: (raw: TRaw, cwd: string) => TResolved;
+  manifestKey: string;
+}) {
+  const { configFileName, schema, resolveConfig: resolve, manifestKey } = opts;
+
+  function load(cwd: string): ConfigLoadResult<TRaw> {
+    return loadJsonConfig(configFileName, schema, cwd);
+  }
+
+  function loadResolved(cwd: string): ConfigLoadResult<TResolved> {
+    const result = load(cwd);
+    if (!result.ok) return result;
+    return { ok: true, config: resolve(result.config, cwd) };
+  }
+
+  function write(cwd: string, config: TRaw): void {
+    writeJsonConfig(configFileName, config, cwd);
+  }
+
+  function update(
+    cwd: string,
+    add?: string[],
+    remove?: string[],
+    metadata?: TMetadata,
+  ): void {
+    updateManifest({ configFileName, schema, manifestKey, cwd, add, remove, metadata });
+  }
+
+  function getItems(cwd: string): Record<string, unknown> | undefined {
+    const result = load(cwd);
+    if (!result.ok) return undefined;
+    return (result.config as Record<string, unknown>)[manifestKey] as Record<string, unknown> | undefined;
+  }
+
+  return {
+    loadConfig: load,
+    loadResolvedConfig: loadResolved,
+    writeConfig: write,
+    updateManifest: update,
+    getManifestItems: getItems,
+  };
+}
+
+function mutateManifest(
+  manifest: Record<string, unknown>,
+  add?: string[],
+  remove?: string[],
+  metadata?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (add) {
+    const now = new Date().toISOString();
+    for (const name of add) manifest[name] = { installedAt: now, ...(metadata ?? {}) };
+  }
+  if (remove) {
+    for (const name of remove) delete manifest[name];
+  }
+  return manifest;
 }

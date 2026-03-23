@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { toErrorMessage } from "./logger.js";
 import { getRelativePath } from "./command-helpers.js";
+import { computeIntegrity } from "./integrity.js";
 
-export const RegistryFileSchema = z.object({
+const RegistryFileSchema = z.object({
   path: z.string().refine(
     (p) => !p.split("/").includes("..") && !p.split("\\").includes(".."),
     { message: "Registry file path must not contain '..' segments" },
@@ -14,7 +14,7 @@ export const RegistryFileSchema = z.object({
   type: z.string().optional(),
 });
 
-export const RegistryItemSchema = z.object({
+const RegistryItemSchema = z.object({
   name: z.string(),
   type: z.string(),
   title: z.string(),
@@ -25,7 +25,7 @@ export const RegistryItemSchema = z.object({
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 
-export type RegistryFile = z.infer<typeof RegistryFileSchema>;
+type RegistryFile = z.infer<typeof RegistryFileSchema>;
 export type RegistryItem = z.infer<typeof RegistryItemSchema>;
 
 export const RegistryContentFileSchema = RegistryFileSchema.extend({
@@ -36,7 +36,7 @@ export const RegistryContentItemSchema = RegistryItemSchema.extend({
   files: z.array(RegistryContentFileSchema),
 });
 
-export type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
+type RegistryContentFile = z.infer<typeof RegistryContentFileSchema>;
 export type RegistryContentItem = z.infer<typeof RegistryContentItemSchema>;
 
 export const BaseRegistryBundleSchema = z.object({
@@ -45,9 +45,9 @@ export const BaseRegistryBundleSchema = z.object({
   integrity: z.string().optional(),
 });
 
-export type BaseRegistryBundle = z.infer<typeof BaseRegistryBundleSchema>;
+type BaseRegistryBundle = z.infer<typeof BaseRegistryBundleSchema>;
 
-export type ParsedRegistryDependencyRef =
+type ParsedRegistryDependencyRef =
   | { kind: "local"; raw: string; name: string }
   | { kind: "namespace"; raw: string; namespace: string; name: string };
 
@@ -78,7 +78,7 @@ export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependenc
   return { kind: "local", raw, name: raw };
 }
 
-export function resolveRegistryDeps(
+function resolveRegistryDeps(
   names: string[],
   getItem: (name: string) => RegistryItem | undefined,
   itemLabel = "item",
@@ -118,7 +118,7 @@ export function resolveRegistryDeps(
   return [...resolved];
 }
 
-export function collectNpmDeps(
+function collectNpmDeps(
   names: string[],
   getItem: (name: string) => RegistryItem | undefined,
 ): string[] {
@@ -137,46 +137,60 @@ export function createRegistryLoader<TBundle extends { integrity?: string; schem
 
   return (): TBundle => {
     if (cached) return cached;
-
-    if (!existsSync(bundlePath)) {
-      throw new Error(
-        `Registry bundle not found at ${bundlePath}. ` +
-        `This usually means the package was not built correctly — try reinstalling.`,
-      );
-    }
-
-    let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(bundlePath, "utf-8"));
-    } catch (e) {
-      throw new Error(
-        `Failed to parse registry bundle at ${bundlePath}. (${toErrorMessage(e)})`,
-      );
-    }
-
-    const bundle = bundleSchema.parse(raw);
-
-    if (bundle.schemaVersion !== undefined && bundle.schemaVersion > CURRENT_SCHEMA_VERSION) {
-      throw new Error(
-        `Registry bundle schema version ${bundle.schemaVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}. ` +
-        `Update this CLI to the latest version.`,
-      );
-    }
-
-    if (bundle.integrity) {
-      const content = JSON.stringify(integrityContent(bundle));
-      const expected = "sha256-" + createHash("sha256").update(content).digest("hex");
-      if (bundle.integrity !== expected) {
-        throw new Error(
-          "Registry bundle integrity mismatch. The bundle may have been tampered with. " +
-          "Reinstall the package or rebuild the registry bundle.",
-        );
-      }
-    }
-
+    const bundle = loadAndValidateBundle(bundlePath, bundleSchema, integrityContent);
     cached = bundle;
-    return cached;
+    return bundle;
   };
+}
+
+function loadAndValidateBundle<TBundle extends { integrity?: string; schemaVersion?: number }>(
+  bundlePath: string,
+  bundleSchema: z.ZodType<TBundle>,
+  integrityContent: (bundle: TBundle) => unknown,
+): TBundle {
+  if (!existsSync(bundlePath)) {
+    throw new Error(
+      `Registry bundle not found at ${bundlePath}. ` +
+      `This usually means the package was not built correctly — try reinstalling.`,
+    );
+  }
+
+  const bundle = bundleSchema.parse(readBundleJson(bundlePath));
+  validateSchemaVersion(bundle);
+  validateIntegrity(bundle, integrityContent);
+  return bundle;
+}
+
+function readBundleJson(bundlePath: string): unknown {
+  try {
+    return JSON.parse(readFileSync(bundlePath, "utf-8"));
+  } catch (e) {
+    throw new Error(`Failed to parse registry bundle at ${bundlePath}. (${toErrorMessage(e)})`);
+  }
+}
+
+function validateSchemaVersion(bundle: { schemaVersion?: number }): void {
+  if (bundle.schemaVersion !== undefined && bundle.schemaVersion > CURRENT_SCHEMA_VERSION) {
+    throw new Error(
+      `Registry bundle schema version ${bundle.schemaVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}. ` +
+      `Update this CLI to the latest version.`,
+    );
+  }
+}
+
+function validateIntegrity<TBundle extends { integrity?: string }>(
+  bundle: TBundle,
+  integrityContent: (bundle: TBundle) => unknown,
+): void {
+  if (!bundle.integrity) return;
+  const content = JSON.stringify(integrityContent(bundle));
+  const expected = computeIntegrity(content);
+  if (bundle.integrity !== expected) {
+    throw new Error(
+      "Registry bundle integrity mismatch. The bundle may have been tampered with. " +
+      "Reinstall the package or rebuild the registry bundle.",
+    );
+  }
 }
 
 export function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
@@ -184,14 +198,14 @@ export function metaField<T>(item: { meta?: Record<string, unknown> }, key: stri
   return val !== undefined ? (val as T) : fallback;
 }
 
-export interface CreateRegistryAccessorsOptions {
+interface CreateRegistryAccessorsOptions {
   loader: () => { items: RegistryContentItem[] };
   itemLabel: string;
   pathPrefixes: string[];
   itemTypeFilter?: string;
 }
 
-export interface RegistryAccessors {
+interface RegistryAccessors {
   getItem: (name: string) => RegistryContentItem | undefined;
   getPublicItems: () => RegistryContentItem[];
   getAllItems: () => RegistryContentItem[];

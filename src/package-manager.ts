@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import type { PackageManager } from "./detect.js";
 import { readPackageJson } from "./detect.js";
 import * as clack from "@clack/prompts";
-import { error, toErrorMessage, isSilentMode } from "./logger.js";
+import { error, isSilentMode } from "./logger.js";
 
 const VALID_PKG_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
 const VERSION_SPEC_PATTERN = /^[a-zA-Z0-9._\-~/^*@:+]+$/;
@@ -38,7 +38,7 @@ function validatePackageNames(deps: string[]): void {
   }
 }
 
-export async function installDeps(pm: PackageManager, deps: string[], cwd: string): Promise<void> {
+async function installDeps(pm: PackageManager, deps: string[], cwd: string): Promise<void> {
   if (deps.length === 0) return;
   validatePackageNames(deps);
 
@@ -54,6 +54,22 @@ export async function installDeps(pm: PackageManager, deps: string[], cwd: strin
       res();
     });
   });
+}
+
+function logInstallError(e: unknown, pm: PackageManager, deps: string[]): void {
+  if (!(e instanceof Error)) {
+    error(`Try manually: ${pm} add ${deps.join(" ")}`);
+    return;
+  }
+  const lines = e.message.split("\n").filter(Boolean);
+  const maxLines = process.env.DEBUG ? lines.length : 3;
+  for (const line of lines.slice(0, maxLines)) {
+    error(line);
+  }
+  if (!process.env.DEBUG && lines.length > maxLines) {
+    error(`  ... ${lines.length - maxLines} more lines (set DEBUG=1 for full output)`);
+  }
+  error(`Try manually: ${pm} add ${deps.join(" ")}`);
 }
 
 export async function installDepsWithSpinner(
@@ -78,17 +94,7 @@ export async function installDepsWithSpinner(
     return true;
   } catch (e) {
     s.stop("Failed to install dependencies");
-    if (e instanceof Error) {
-      const lines = e.message.split("\n").filter(Boolean);
-      const maxLines = process.env.DEBUG ? lines.length : 3;
-      for (const line of lines.slice(0, maxLines)) {
-        error(line);
-      }
-      if (!process.env.DEBUG && lines.length > maxLines) {
-        error(`  ... ${lines.length - maxLines} more lines (set DEBUG=1 for full output)`);
-      }
-    }
-    error(`Try manually: ${pm} add ${deps.join(" ")}`);
+    logInstallError(e, pm, deps);
     return false;
   }
 }

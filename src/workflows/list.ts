@@ -21,44 +21,23 @@ export interface RunListWorkflowOptions<TItem, TConfig> {
   toDisplayItem: (item: TItem) => ListDisplayItem;
 }
 
-export function runListWorkflow<TItem, TConfig>(
-  options: RunListWorkflowOptions<TItem, TConfig>,
-): void {
-  const {
-    cwd,
-    includeAll,
-    installedOnly,
-    json,
-    itemPlural,
-    getAllItems,
-    getPublicItems,
-    requireConfig,
-    isInstalled,
-    toDisplayItem,
-  } = options;
+function resolveItems<TItem, TConfig>(options: RunListWorkflowOptions<TItem, TConfig>): TItem[] {
+  const { cwd, includeAll, installedOnly, getAllItems, getPublicItems, requireConfig, isInstalled } = options;
 
-  let items = includeAll ? getAllItems() : getPublicItems();
-  if (installedOnly) {
-    const config = requireConfig(cwd);
-    items = items.filter((item) => isInstalled({ cwd, config, item }));
-  }
+  const items = includeAll ? getAllItems() : getPublicItems();
+  if (!installedOnly) return items;
 
-  const displayItems = items
-    .map(toDisplayItem)
-    .sort((left, right) => left.name.localeCompare(right.name));
+  const config = requireConfig(cwd);
+  return items.filter((item) => isInstalled({ cwd, config, item }));
+}
 
-  if (json) {
-    console.log(JSON.stringify(displayItems, null, 2));
-    return;
-  }
+function printEmptyMessage(installedOnly: boolean, itemPlural: string): void {
+  newline();
+  info(installedOnly ? `No installed ${itemPlural} found.` : `No ${itemPlural} available.`);
+  newline();
+}
 
-  if (displayItems.length === 0) {
-    newline();
-    info(installedOnly ? `No installed ${itemPlural} found.` : `No ${itemPlural} available.`);
-    newline();
-    return;
-  }
-
+function printTable(displayItems: ListDisplayItem[], installedOnly: boolean, itemPlural: string): void {
   const label = installedOnly ? "Installed" : "Available";
   newline();
   info(`${label} ${itemPlural} (${displayItems.length}):`);
@@ -69,4 +48,23 @@ export function runListWorkflow<TItem, TConfig>(
     info(`  ${item.name.padEnd(maxLen)} ${item.description}`);
   }
   newline();
+}
+
+export function runListWorkflow<TItem, TConfig>(
+  options: RunListWorkflowOptions<TItem, TConfig>,
+): void {
+  const { json, installedOnly, itemPlural, toDisplayItem } = options;
+
+  const displayItems = resolveItems(options)
+    .map(toDisplayItem)
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  if (json) {
+    console.log(JSON.stringify(displayItems, null, 2));
+    return;
+  }
+
+  if (displayItems.length === 0) return printEmptyMessage(installedOnly, itemPlural);
+
+  printTable(displayItems, installedOnly, itemPlural);
 }

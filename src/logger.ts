@@ -19,7 +19,7 @@ export function setSilent(value: boolean): void {
 export function showBanner(name: string): void {
   if (isSilent) return;
   figlet.parseFont("Big", bigFont);
-  const banner = figlet.textSync(name, { font: "Big" as figlet.Fonts });
+  const banner = figlet.textSync(name, { font: "Big" });
   console.log(pc.dim(banner));
   console.log();
 }
@@ -68,32 +68,13 @@ export async function promptConfirm(message: string, initialValue = true): Promi
   return result;
 }
 
-export async function promptSelect<T extends { value: string; label: string; hint?: string }>(
+export async function promptSelect(
   message: string,
-  options: T[],
+  options: { value: string; label: string; hint?: string }[],
 ): Promise<string> {
   if (isSilent) return options[0]?.value ?? "";
 
   const result = await clack.select({ message, options });
-  if (clack.isCancel(result)) {
-    throw new CancelError();
-  }
-  return result as string;
-}
-
-export async function promptText(message: string, opts?: {
-  placeholder?: string;
-  defaultValue?: string;
-  validate?: (value: string) => string | undefined;
-}): Promise<string> {
-  if (isSilent) return opts?.defaultValue ?? "";
-
-  const result = await clack.text({
-    message,
-    placeholder: opts?.placeholder,
-    defaultValue: opts?.defaultValue,
-    validate: opts?.validate,
-  });
   if (clack.isCancel(result)) {
     throw new CancelError();
   }

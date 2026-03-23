@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { info, success, warn, heading, fileAction, newline, promptConfirm } from "../logger.js";
 import type { ConfigLoadResult } from "../config.js";
@@ -17,68 +17,82 @@ export interface InitWorkflowOptions<TConfig> {
   nextSteps: string[];
 }
 
-export async function runInitWorkflow<TConfig>(options: InitWorkflowOptions<TConfig>): Promise<void> {
-  const { cwd, configFileName, yes, force, loadConfig, detectProject, createFiles, afterFiles, writeConfig, nextSteps } = options;
-
+function ensurePackageJson(cwd: string): void {
   if (!existsSync(resolve(cwd, "package.json"))) {
     throw new Error("No package.json found. Run `npm init` first.");
   }
+}
 
-  const existing = loadConfig(cwd);
+function checkExistingConfig<TConfig>(
+  existing: ConfigLoadResult<TConfig>,
+  configFileName: string,
+  cwd: string,
+  force: boolean,
+): "skip" | "continue" {
   if (existing.ok && !force) {
     warn(`${configFileName.replace(/\.json$/, "")} is already initialized in this project.`);
     info(`Config: ${resolve(cwd, configFileName)}`);
     info("Use --force to re-initialize.");
-    return;
+    return "skip";
   }
 
-  if (
-    !existing.ok
-    && (existing.error === "parse_error" || existing.error === "validation_error")
-    && !force
-  ) {
+  if (!existing.ok && (existing.error === "parse_error" || existing.error === "validation_error") && !force) {
     throw new Error(
       `${configFileName} is malformed: ${existing.message}\n`
       + `Fix the syntax error, delete ${configFileName}, or use --force to re-initialize.`,
     );
   }
 
-  const project = detectProject(cwd);
+  return "continue";
+}
 
+function showDetected(display: Array<[label: string, value: string]>): void {
   heading("Detected:");
-  for (const [label, value] of project.display) {
+  for (const [label, value] of display) {
     info(`${label}: ${value}`);
   }
   newline();
+}
 
-  if (!yes) {
-    const proceed = await promptConfirm("Continue with initialization?");
-    if (!proceed) {
-      info("Cancelled.");
-      return;
-    }
-  }
-
+function logFileResults(results: Array<{ action: "created" | "skipped"; path: string }>): void {
   heading("Creating files...");
-  const fileResults = createFiles(cwd);
-  for (const result of fileResults) {
+  for (const result of results) {
     fileAction(
       result.action === "created" ? pc.green("+") : pc.dim("skip"),
       result.path,
     );
   }
+}
 
-  if (afterFiles) {
-    await afterFiles(cwd);
+function showNextSteps(steps: string[]): void {
+  newline();
+  success("Done!");
+  for (const step of steps) {
+    info(step);
   }
+  newline();
+}
+
+export async function runInitWorkflow<TConfig>(options: InitWorkflowOptions<TConfig>): Promise<void> {
+  const { cwd, configFileName, yes, force, loadConfig, detectProject, createFiles, afterFiles, writeConfig, nextSteps } = options;
+
+  ensurePackageJson(cwd);
+
+  const existing = loadConfig(cwd);
+  if (checkExistingConfig(existing, configFileName, cwd, force) === "skip") return;
+
+  showDetected(detectProject(cwd).display);
+
+  if (!yes) {
+    const proceed = await promptConfirm("Continue with initialization?");
+    if (!proceed) { info("Cancelled."); return; }
+  }
+
+  logFileResults(createFiles(cwd));
+  if (afterFiles) await afterFiles(cwd);
 
   await writeConfig(cwd);
   fileAction(pc.green("+"), configFileName);
 
-  newline();
-  success("Done!");
-  for (const step of nextSteps) {
-    info(step);
-  }
-  newline();
+  showNextSteps(nextSteps);
 }

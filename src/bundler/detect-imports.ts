@@ -1,3 +1,4 @@
+const IMPORT_FROM_PATTERN = /from\s+["']([^"']+)["']/;
 const DEFAULT_PEER_DEPS = new Set<string>();
 const DEFAULT_ALIAS_PREFIXES = ["@/", "./", "../", "node:"];
 
@@ -18,7 +19,7 @@ export function detectNpmImports(
     if (/^\s*import\s+type\s/.test(line)) continue;
     if (/^\s*export\s+type\s/.test(line)) continue;
 
-    const match = /from\s+["']([^"']+)["']/.exec(line);
+    const match = IMPORT_FROM_PATTERN.exec(line);
     if (!match) continue;
 
     const pkg = match[1];
