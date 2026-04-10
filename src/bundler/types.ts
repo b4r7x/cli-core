@@ -15,23 +15,16 @@ export interface BundleItem {
 }
 
 export interface BundlerConfig {
-  /** Absolute path to the project root (where registry/ lives). */
   rootDir: string;
-  /** Absolute path to output the bundle JSON. */
   outputPath: string;
-  /** Peer deps to exclude from npm import detection. */
   peerDeps?: Set<string>;
-  /** Core deps to strip from detected dependencies (e.g. cva, clsx). */
+  /** Deps to strip from auto-detected dependencies (e.g. cva, clsx that ship with the project). */
   coreDeps?: Set<string>;
-  /** Import path prefixes to skip during npm import detection. */
   aliasPrefixes?: string[];
-  /** Optional path rewriting for bundle file paths. */
   transformPath?: (path: string) => string;
-  /** Return extra top-level fields to include in the bundle (e.g. theme, styles). */
+  /** Return extra top-level fields to merge into the bundle JSON (e.g. theme, styles). */
   extraContent?: (rootDir: string) => Record<string, unknown>;
-  /** Default value for the `client` field when not specified. */
   clientDefault?: boolean;
-  /** Label for items in error messages (e.g. "hook", "component"). */
   itemLabel?: string;
 }
 

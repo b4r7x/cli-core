@@ -42,6 +42,12 @@ function skipBlockComment(json: string, i: number, len: number): number {
   return i + 2;
 }
 
+export function isEnoent(e: unknown): boolean {
+  if (!(e instanceof Error) || !("code" in e)) return false;
+  const err: Error & { code: unknown } = e;
+  return err.code === "ENOENT";
+}
+
 export function ensureWithinDir(targetPath: string, baseDir: string): void {
   const resolvedTarget = resolve(targetPath);
   const resolvedBase = resolve(baseDir);
@@ -74,7 +80,7 @@ export function cleanEmptyDirs(dirs: string[]): void {
 function tryRemoveIfEmpty(dir: string): void {
   try {
     if (existsSync(dir) && readdirSync(dir).length === 0) rmSync(dir, { recursive: true });
-  } catch {}
+  } catch { /* Best-effort cleanup of empty dirs */ }
 }
 
 export function readTsConfigPaths(cwd: string): Record<string, string[]> | null {
@@ -91,8 +97,22 @@ function tryReadPaths(configPath: string): Record<string, string[]> | null {
     const config = JSON.parse(stripJsonComments(raw));
     const paths = config.compilerOptions?.paths;
     if (paths && typeof paths === "object") return paths;
-  } catch {}
+  } catch { /* Optional tsconfig reading; missing file is OK */ }
   return null;
+}
+
+export function atomicWriteFile(targetPath: string, content: string, opts?: { ensureDir?: boolean }): void {
+  if (opts?.ensureDir !== false) {
+    mkdirSync(dirname(targetPath), { recursive: true });
+  }
+  const tmpPath = join(dirname(targetPath), `.tmp-${randomBytes(6).toString("hex")}`);
+  try {
+    writeFileSync(tmpPath, content);
+    renameSync(tmpPath, targetPath);
+  } catch (e) {
+    try { rmSync(tmpPath); } catch { /* Best-effort temp file cleanup; original error is re-thrown */ }
+    throw e;
+  }
 }
 
 export type WriteResult = "written" | "skipped" | "overwritten";
@@ -108,17 +128,7 @@ export function writeFileSafe(
     return "skipped";
   }
 
-  const dir = dirname(filePath);
-  mkdirSync(dir, { recursive: true });
-
-  const tmpPath = join(dir, `.tmp-${randomBytes(6).toString("hex")}`);
-  try {
-    writeFileSync(tmpPath, content);
-    renameSync(tmpPath, filePath);
-  } catch (e) {
-    try { rmSync(tmpPath); } catch {}
-    throw e;
-  }
+  atomicWriteFile(filePath, content);
 
   return exists ? "overwritten" : "written";
 }
@@ -133,4 +143,21 @@ export function copyGeneratedDir(
     throw new Error(`${srcRelative}/ not found. Run prebuild first.`);
   }
   cpSync(src, resolve(pkgRoot, distRelative), { recursive: true, force: true });
+}
+
+export function getRelativePath(
+  file: { path: string; targetPath?: string },
+  prefixes: string[],
+): string {
+  if (file.targetPath) {
+    return file.targetPath;
+  }
+  for (const prefix of prefixes) {
+    if (file.path.startsWith(prefix)) {
+      return file.path.slice(prefix.length);
+    }
+  }
+  throw new Error(
+    `Unsupported registry file path "${file.path}". Expected path to start with one of: ${prefixes.map(p => `"${p}"`).join(", ")}.`,
+  );
 }

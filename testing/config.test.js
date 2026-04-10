@@ -1,21 +1,16 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { z } from "zod";
 
 import { loadJsonConfig, writeJsonConfig, aliasToFsPath, updateManifest } from "../dist/config.js";
-import { setSilent } from "../dist/logger.js";
+import { createTmp, withSilent } from "./helpers.js";
 
 const TestSchema = z.object({
   name: z.string(),
   version: z.number().optional(),
 });
-
-function createTmp() {
-  return mkdtempSync(join(tmpdir(), "cli-core-config-"));
-}
 
 test("loadJsonConfig", async (t) => {
   await t.test("returns ok with parsed config for valid JSON", () => {
@@ -115,47 +110,47 @@ test("updateManifest", async (t) => {
   });
 
   await t.test("adds entries to manifest", () => {
-    setSilent(true);
-    const tmp = createTmp();
-    try {
-      writeJsonConfig("cfg.json", { name: "test" }, tmp);
-      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, add: ["button", "card"] });
-      const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
-      assert.ok(config.installed.button);
-      assert.ok(config.installed.card);
-      assert.ok(config.installed.button.installedAt);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+    withSilent(() => {
+      const tmp = createTmp();
+      try {
+        writeJsonConfig("cfg.json", { name: "test" }, tmp);
+        updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, add: ["button", "card"] });
+        const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
+        assert.ok(config.installed.button);
+        assert.ok(config.installed.card);
+        assert.ok(config.installed.button.installedAt);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 
   await t.test("removes entries from manifest", () => {
-    setSilent(true);
-    const tmp = createTmp();
-    try {
-      writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" }, card: { installedAt: "x" } } }, tmp);
-      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
-      const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
-      assert.equal(config.installed.button, undefined);
-      assert.ok(config.installed.card);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+    withSilent(() => {
+      const tmp = createTmp();
+      try {
+        writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" }, card: { installedAt: "x" } } }, tmp);
+        updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
+        const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
+        assert.equal(config.installed.button, undefined);
+        assert.ok(config.installed.card);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 
   await t.test("removes manifest key when all entries removed", () => {
-    setSilent(true);
-    const tmp = createTmp();
-    try {
-      writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" } } }, tmp);
-      updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
-      const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
-      assert.equal(config.installed, undefined);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+    withSilent(() => {
+      const tmp = createTmp();
+      try {
+        writeJsonConfig("cfg.json", { name: "test", installed: { button: { installedAt: "x" } } }, tmp);
+        updateManifest({ configFileName: "cfg.json", schema: ManifestSchema, manifestKey: "installed", cwd: tmp, remove: ["button"] });
+        const config = JSON.parse(readFileSync(join(tmp, "cfg.json"), "utf-8"));
+        assert.equal(config.installed, undefined);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 });

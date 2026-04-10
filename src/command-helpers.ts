@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { error, toErrorMessage } from "./logger.js";
+import { error, toErrorMessage, CancelError } from "./logger.js";
 import type { ConfigLoadResult } from "./config.js";
 import type { RegistryItem } from "./registry.js";
 
@@ -9,13 +9,14 @@ export function withErrorHandler<TArgs extends unknown[]>(fn: (...args: TArgs) =
     try {
       await fn(...args);
     } catch (e) {
+      if (e instanceof CancelError) throw e;
       error(toErrorMessage(e));
       process.exit(1);
     }
   };
 }
 
-function createRequireConfig<TResolved>(options: {
+export function createRequireConfig<TResolved>(options: {
   configFileName: string;
   initCommand: string;
   loadResolved: (cwd: string) => ConfigLoadResult<TResolved>;
@@ -59,29 +60,12 @@ function validateItems<T extends RegistryItem>(
   }
 }
 
-export function getRelativePath(
-  file: { path: string; targetPath?: string },
-  prefixes: string[],
-): string {
-  if (file.targetPath) {
-    return file.targetPath;
-  }
-  for (const prefix of prefixes) {
-    if (file.path.startsWith(prefix)) {
-      return file.path.slice(prefix.length);
-    }
-  }
-  throw new Error(
-    `Unsupported registry file path "${file.path}". Expected path to start with one of: ${prefixes.map(p => `"${p}"`).join(", ")}.`,
-  );
-}
-
 export function parseEnumOption<T extends string>(
   value: string,
   validValues: readonly T[],
   optionName: string,
 ): T {
-  if (!validValues.includes(value as T)) {
+  if (!(validValues as readonly string[]).includes(value)) {
     throw new Error(
       `Invalid ${optionName}: "${value}". Must be one of: ${validValues.join(", ")}`,
     );

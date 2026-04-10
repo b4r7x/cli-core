@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { ensureWithinDir, ensureWithinAnyDir, readTsConfigPaths, writeFileSafe, copyGeneratedDir, cleanEmptyDirs } from "../dist/fs.js";
-
-function createTmp() {
-  return mkdtempSync(join(tmpdir(), "cli-core-fs-"));
-}
+import { createTmp } from "./helpers.js";
 
 test("ensureWithinDir", async (t) => {
   await t.test("allows paths within base dir", () => {

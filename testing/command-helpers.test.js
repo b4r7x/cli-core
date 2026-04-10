@@ -6,12 +6,11 @@ import test from "node:test";
 
 import {
   createRequireConfig,
-  getItemOrThrow,
-  validateItems,
-  getRelativePath,
+  createItemAccessors,
   parseEnumOption,
   createInstallChecker,
 } from "../dist/command-helpers.js";
+import { getRelativePath } from "../dist/fs.js";
 
 test("createRequireConfig", async (t) => {
   await t.test("returns config when loadResolved succeeds", () => {
@@ -42,29 +41,45 @@ test("createRequireConfig", async (t) => {
   });
 });
 
-test("getItemOrThrow", async (t) => {
+test("createItemAccessors.getOrThrow", async (t) => {
   const items = new Map([["button", { name: "button", type: "ui", title: "Button", description: "", dependencies: [], registryDependencies: [], files: [] }]]);
+  const { getOrThrow } = createItemAccessors({
+    configFileName: "test.json",
+    initCommand: "test init",
+    itemLabel: "component",
+    listCommand: "list",
+    loadResolved: () => ({ ok: true, config: {} }),
+    getItem: (n) => items.get(n),
+  });
 
   await t.test("returns item when found", () => {
-    const item = getItemOrThrow("button", (n) => items.get(n), "component", "list");
+    const item = getOrThrow("button");
     assert.equal(item.name, "button");
   });
 
   await t.test("throws when not found", () => {
-    assert.throws(() => getItemOrThrow("missing", (n) => items.get(n), "component", "list"), /not found/);
+    assert.throws(() => getOrThrow("missing"), /not found/);
   });
 });
 
-test("validateItems", async (t) => {
+test("createItemAccessors.validate", async (t) => {
   const items = new Map([["button", {}], ["card", {}]]);
+  const { validate } = createItemAccessors({
+    configFileName: "test.json",
+    initCommand: "test init",
+    itemLabel: "component",
+    listCommand: "list",
+    loadResolved: () => ({ ok: true, config: {} }),
+    getItem: (n) => items.get(n),
+  });
 
   await t.test("does not throw when all items exist", () => {
-    assert.doesNotThrow(() => validateItems(["button", "card"], (n) => items.get(n), "component", "list"));
+    assert.doesNotThrow(() => validate(["button", "card"]));
   });
 
   await t.test("throws listing all missing items", () => {
     assert.throws(
-      () => validateItems(["button", "missing1", "missing2"], (n) => items.get(n), "component", "list"),
+      () => validate(["button", "missing1", "missing2"]),
       /missing1.*missing2/,
     );
   });

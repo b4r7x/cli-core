@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { withErrorHandler } from "./command-helpers.js";
+import type { RegistryItem } from "./registry.js";
 import { runInitWorkflow } from "./workflows/init.js";
 import { runAddWorkflow } from "./workflows/add.js";
 import { runListWorkflow, type ListDisplayItem } from "./workflows/list.js";
@@ -13,9 +14,21 @@ export interface ExtraOption {
   default?: string;
 }
 
-type ParsedOpts = Record<string, unknown>;
+export interface SharedCommandOptions {
+  cwd: string;
+  yes?: boolean;
+  dryRun?: boolean;
+  overwrite?: boolean;
+  skipInstall?: boolean;
+  all?: boolean;
+  json?: boolean;
+  installed?: boolean;
+  force?: boolean;
+  /** CLI-specific options added via extraOptions */
+  [key: string]: unknown;
+}
 
-const resolveCwd = (opts: ParsedOpts) => resolve(String(opts.cwd));
+const resolveCwd = (opts: SharedCommandOptions) => resolve(opts.cwd);
 
 function addExtraOptions(cmd: Command, extras: ExtraOption[] | undefined): void {
   for (const opt of extras ?? []) {
@@ -23,13 +36,7 @@ function addExtraOptions(cmd: Command, extras: ExtraOption[] | undefined): void 
   }
 }
 
-interface RegistryLikeItem {
-  name: string;
-  title: string;
-  description: string;
-  dependencies: string[];
-  files: Array<{ path: string; targetPath?: string }>;
-}
+type RegistryLikeItem = Pick<RegistryItem, 'name' | 'title' | 'description' | 'dependencies' | 'files'>;
 
 export interface ListCommandConfig<TItem extends RegistryLikeItem, TConfig> {
   itemPlural: string;
@@ -52,15 +59,15 @@ function buildListAction<TItem extends RegistryLikeItem, TConfig>(
     files: item.files.map((file) => config.getRelativePath(file)),
   }));
 
-  return withErrorHandler(async (opts: ParsedOpts) => {
+  return withErrorHandler(async (opts: SharedCommandOptions) => {
     const cwd = resolveCwd(opts);
     let checker: ((name: string) => boolean) | undefined;
 
     runListWorkflow({
       cwd,
-      includeAll: Boolean(opts.all),
-      installedOnly: Boolean(opts.installed),
-      json: Boolean(opts.json),
+      includeAll: opts.all ?? false,
+      installedOnly: opts.installed ?? false,
+      json: opts.json ?? false,
       itemPlural: config.itemPlural,
       getAllItems: config.getAllItems,
       getPublicItems: config.getPublicItems,
@@ -97,7 +104,7 @@ export interface DiffCommandConfig<TConfig> {
 }
 
 function buildDiffAction<TConfig>(config: DiffCommandConfig<TConfig>) {
-  return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
+  return withErrorHandler(async (names: string[], opts: SharedCommandOptions) => {
     const cwd = resolveCwd(opts);
 
     runDiffWorkflow({
@@ -142,14 +149,14 @@ export interface RemoveCommandConfig<TItem, TConfig> {
 function buildRemoveAction<TItem, TConfig>(
   config: RemoveCommandConfig<TItem, TConfig>,
 ) {
-  return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
+  return withErrorHandler(async (names: string[], opts: SharedCommandOptions) => {
     const cwd = resolveCwd(opts);
 
     await runRemoveWorkflow({
       cwd,
       names,
-      yes: Boolean(opts.yes),
-      dryRun: Boolean(opts.dryRun),
+      yes: opts.yes ?? false,
+      dryRun: opts.dryRun ?? false,
       itemPlural: config.itemPlural,
       requireConfig: config.requireConfig,
       validateNames: config.validateNames,
@@ -180,21 +187,21 @@ export function createRemoveCommand<TItem, TConfig>(
 export interface InitCommandConfig<TConfig> {
   configFileName: string;
   loadConfig: (cwd: string) => import("./config.js").ConfigLoadResult<TConfig>;
-  detectProject: (cwd: string, opts: ParsedOpts) => { display: Array<[label: string, value: string]> };
-  createFiles: (cwd: string, opts: ParsedOpts) => Array<{ action: "created" | "skipped"; path: string }>;
+  detectProject: (cwd: string, opts: SharedCommandOptions) => { display: Array<[label: string, value: string]> };
+  createFiles: (cwd: string, opts: SharedCommandOptions) => Array<{ action: "created" | "skipped"; path: string }>;
   afterFiles?: (cwd: string) => Promise<void>;
-  writeConfig: (cwd: string, opts: ParsedOpts) => void | Promise<void>;
+  writeConfig: (cwd: string, opts: SharedCommandOptions) => void | Promise<void>;
   nextSteps: string[];
   extraOptions?: ExtraOption[];
 }
 
 function buildInitAction<TConfig>(config: InitCommandConfig<TConfig>) {
-  return withErrorHandler(async (opts: ParsedOpts) => {
+  return withErrorHandler(async (opts: SharedCommandOptions) => {
     const cwd = resolveCwd(opts);
     await runInitWorkflow({
       cwd,
-      yes: Boolean(opts.yes),
-      force: Boolean(opts.force),
+      yes: opts.yes ?? false,
+      force: opts.force ?? false,
       configFileName: config.configFileName,
       loadConfig: config.loadConfig,
       detectProject: (cwd) => config.detectProject(cwd, opts),
@@ -234,22 +241,22 @@ export interface AddCommandConfig<TConfig> {
     config: TConfig;
     names: string[];
     all: boolean;
-    opts: ParsedOpts;
+    opts: SharedCommandOptions;
   }) => Promise<import("./workflows/add.js").AddWorkflowPlan> | import("./workflows/add.js").AddWorkflowPlan;
   extraOptions?: ExtraOption[];
 }
 
 function buildAddAction<TConfig>(config: AddCommandConfig<TConfig>) {
-  return withErrorHandler(async (names: string[], opts: ParsedOpts) => {
+  return withErrorHandler(async (names: string[], opts: SharedCommandOptions) => {
     const cwd = resolveCwd(opts);
     await runAddWorkflow({
       cwd,
       requestedNames: names,
-      all: Boolean(opts.all),
-      yes: Boolean(opts.yes),
-      dryRun: Boolean(opts.dryRun),
-      overwrite: Boolean(opts.overwrite),
-      skipInstall: Boolean(opts.skipInstall),
+      all: opts.all ?? false,
+      yes: opts.yes ?? false,
+      dryRun: opts.dryRun ?? false,
+      overwrite: opts.overwrite ?? false,
+      skipInstall: opts.skipInstall ?? false,
       itemLabel: config.itemLabel,
       itemPlural: config.itemPlural,
       listCommand: config.listCommand,

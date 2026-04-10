@@ -1,10 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { metaField, parseRegistryDependencyRef } from "../registry.js";
 import { info, heading, toErrorMessage } from "../logger.js";
+import { atomicWriteFile } from "../fs.js";
 import { computeIntegrity } from "../integrity.js";
-import { detectNpmImports } from "./detect-imports.js";
-import type { DetectNpmImportsOptions } from "./detect-imports.js";
+import { detectNpmImports, type DetectNpmImportsOptions } from "./detect-imports.js";
 import { RegistrySourceSchema, type RegistrySourceItem } from "./schemas.js";
 import type { BundleFile, BundleItem, BundlerConfig, BundleResult } from "./types.js";
 
@@ -116,8 +116,8 @@ function bundleItem(
   return {
     name: sourceItem.name,
     type: sourceItem.type,
-    title: sourceItem.title,
-    description: sourceItem.description,
+    title: sourceItem.title ?? sourceItem.name,
+    description: sourceItem.description ?? "",
     dependencies: [...detectedDeps],
     registryDependencies: sourceItem.registryDependencies,
     files,
@@ -127,13 +127,6 @@ function bundleItem(
       optionalIntegrations: metaField<string[]>(sourceItem, "optionalIntegrations", []),
     },
   };
-}
-
-function writeBundleAtomically(outputPath: string, bundleJson: string): void {
-  mkdirSync(dirname(outputPath), { recursive: true });
-  const tmpPath = outputPath + ".tmp";
-  writeFileSync(tmpPath, bundleJson);
-  renameSync(tmpPath, outputPath);
 }
 
 function reportBundleSummary(summary: BundleSummary, items: BundleItem[]): void {
@@ -169,7 +162,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
       itemLabel,
       detectOpts: { peerDeps: config.peerDeps, aliasPrefixes: config.aliasPrefixes },
       transformPath: config.transformPath,
-      coreDeps: config.coreDeps ? new Set(config.coreDeps) : undefined,
+      coreDeps: config.coreDeps,
       clientDefault,
     };
     const items = sourceItems.map((item) => bundleItem(item, ctx));
@@ -178,7 +171,7 @@ export function createBundler(config: BundlerConfig): () => BundleResult {
     const integrity = computeIntegrity(JSON.stringify({ items, ...extra }));
     const bundleJson = JSON.stringify({ schemaVersion: 1, items, ...extra, integrity });
 
-    writeBundleAtomically(outputPath, bundleJson);
+    atomicWriteFile(outputPath, bundleJson);
     const totalFiles = items.reduce((acc, i) => acc + i.files.length, 0);
     reportBundleSummary({ itemCount: items.length, fileCount: totalFiles, bundleJson, integrity, outputPath, itemLabel }, items);
 

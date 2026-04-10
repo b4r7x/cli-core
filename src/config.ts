@@ -1,9 +1,9 @@
-import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { z } from "zod";
 import { toErrorMessage, warn } from "./logger.js";
 import { detectSourceDir } from "./detect.js";
+import { atomicWriteFile } from "./fs.js";
 
 const ALIAS_PATTERN = /^(@\/|\.\.?\/)/;
 
@@ -59,12 +59,9 @@ function validateParsed<T>(
 
 export function writeJsonConfig(configFileName: string, data: unknown, cwd: string): void {
   const configPath = resolve(cwd, configFileName);
-  const tmpPath = join(cwd, `.tmp-${randomBytes(6).toString("hex")}`);
   try {
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n");
-    renameSync(tmpPath, configPath);
+    atomicWriteFile(configPath, JSON.stringify(data, null, 2) + "\n");
   } catch (e) {
-    try { rmSync(tmpPath); } catch {}
     throw new Error(`Failed to write config to ${configPath}: ${toErrorMessage(e)}`);
   }
 }
@@ -75,11 +72,10 @@ export function resolveAliasedPaths<K extends string>(
   cwd?: string,
 ): Record<K, string> {
   const sourceDir = cwd ? detectSourceDir(cwd) : ".";
-  const result = {} as Record<K, string>;
-  for (const key of Object.keys(rawPaths) as K[]) {
-    result[key] = rawPaths[key] ?? aliasToFsPath(aliases[key], sourceDir);
-  }
-  return result;
+  const entries = (Object.keys(rawPaths) as K[]).map(
+    (key) => [key, rawPaths[key] ?? aliasToFsPath(aliases[key], sourceDir)] as const,
+  );
+  return Object.fromEntries(entries) as Record<K, string>;
 }
 
 export function updateManifest<T extends Record<string, unknown>>(opts: {
@@ -97,9 +93,12 @@ export function updateManifest<T extends Record<string, unknown>>(opts: {
     return;
   }
 
-  const config = { ...result.config } as Record<string, unknown>;
+  // Spread into a mutable record for manifest mutation — safe since T extends Record<string, unknown>
+  // and this is only used for JSON serialization, not returned as T.
+  const config: Record<string, unknown> = { ...result.config };
+  const existing = config[opts.manifestKey];
   const manifest = mutateManifest(
-    { ...(config[opts.manifestKey] as Record<string, unknown> | undefined) },
+    { ...(existing && typeof existing === "object" && !Array.isArray(existing) ? existing as Record<string, unknown> : {}) },
     opts.add, opts.remove, opts.metadata,
   );
 
@@ -149,7 +148,10 @@ export function createConfigModule<
   function getItems(cwd: string): Record<string, unknown> | undefined {
     const result = load(cwd);
     if (!result.ok) return undefined;
-    return (result.config as Record<string, unknown>)[manifestKey] as Record<string, unknown> | undefined;
+    const val = result.config[manifestKey];
+    return val && typeof val === "object" && !Array.isArray(val)
+      ? val as Record<string, unknown>
+      : undefined;
   }
 
   return {

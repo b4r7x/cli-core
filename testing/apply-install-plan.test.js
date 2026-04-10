@@ -6,12 +6,11 @@ import test from "node:test";
 // This file tests the applyInstallPlan dry-run and confirmation logic.
 
 import { applyInstallPlan } from "../dist/workflows/apply-install-plan.js";
-import { setSilent } from "../dist/logger.js";
+import { withSilentAsync } from "./helpers.js";
 
 test("applyInstallPlan dry-run mode", async (t) => {
   await t.test("calls onDryRun and does not write files", async () => {
-    setSilent(true);
-    try {
+    await withSilentAsync(async () => {
       let dryRunCalled = false;
       let appliedCalled = false;
 
@@ -30,8 +29,6 @@ test("applyInstallPlan dry-run mode", async (t) => {
 
       assert.equal(dryRunCalled, true);
       assert.equal(appliedCalled, false);
-    } finally {
-      setSilent(false);
-    }
+    });
   });
 });

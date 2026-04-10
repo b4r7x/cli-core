@@ -1,19 +1,13 @@
 import { z } from "zod";
+import { RegistryItemSchema } from "../registry.js";
 
 export const RegistrySourceFileSchema = z.object({
   path: z.string(),
   type: z.string().optional(),
 });
 
-export const RegistrySourceItemSchema = z.object({
-  name: z.string(),
-  type: z.string(),
-  title: z.string(),
-  description: z.string(),
-  dependencies: z.array(z.string()).optional().default([]),
-  registryDependencies: z.array(z.string()).optional().default([]),
+export const RegistrySourceItemSchema = RegistryItemSchema.extend({
   files: z.array(RegistrySourceFileSchema),
-  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const RegistrySourceSchema = z.object({

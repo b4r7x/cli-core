@@ -42,7 +42,6 @@ runCli(program);
 | `add-helpers.ts` | `writeFilesWithRollback`, `installDepsWithRollback`, `showDryRunPreview` |
 | `bundler/` | `createBundler`, `detectNpmImports` |
 | `workflows/` | `runInitWorkflow`, `runAddWorkflow`, `runListWorkflow`, `runDiffWorkflow`, `runRemoveWorkflow` |
-| Re-exports | `Command` (commander), `z` (zod), `pc` (picocolors) |
 
 ## Workflows
 

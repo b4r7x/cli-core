@@ -48,8 +48,9 @@ export interface WriteFilesResult {
   createdDirs: string[];
 }
 
-function trackNewDir(dir: string, existingDirs: Set<string>, createdDirs: string[]): void {
-  if (existingDirs.has(dir) || createdDirs.includes(dir)) return;
+function trackNewDir(dir: string, existingDirs: Set<string>, createdDirs: string[], createdDirSet: Set<string>): void {
+  if (existingDirs.has(dir) || createdDirSet.has(dir)) return;
+  createdDirSet.add(dir);
   createdDirs.push(dir);
 }
 
@@ -92,11 +93,12 @@ export function writeFilesWithRollback(
     fileOps.map((op) => dirname(op.targetPath)).filter((dir) => existsSync(dir)),
   );
   const createdDirs: string[] = [];
+  const createdDirSet = new Set<string>();
   const results: WriteResult[] = [];
 
   try {
     for (const op of fileOps) {
-      trackNewDir(dirname(op.targetPath), existingDirs, createdDirs);
+      trackNewDir(dirname(op.targetPath), existingDirs, createdDirs, createdDirSet);
       backupIfOverwriting(op.targetPath, overwrite, backups);
       const result = writeFileSafe(op.targetPath, op.content, overwrite);
       logWriteResult(result, op, newFiles);

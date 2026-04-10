@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { toErrorMessage } from "./logger.js";
-import { getRelativePath } from "./command-helpers.js";
+import { getRelativePath } from "./fs.js";
 import { computeIntegrity } from "./integrity.js";
 
 const RegistryFileSchema = z.object({
@@ -14,13 +14,16 @@ const RegistryFileSchema = z.object({
   type: z.string().optional(),
 });
 
-const RegistryItemSchema = z.object({
+// NOTE: Near-identical schema exists in registry-kit/src/registry-types.ts.
+// This copy adds targetPath field and path traversal .refine().
+// Intentionally duplicated: cli-core and registry-kit have no dependency relationship.
+export const RegistryItemSchema = z.object({
   name: z.string(),
   type: z.string(),
-  title: z.string(),
-  description: z.string(),
-  dependencies: z.array(z.string()),
-  registryDependencies: z.array(z.string()),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  dependencies: z.array(z.string()).default([]),
+  registryDependencies: z.array(z.string()).default([]),
   files: z.array(RegistryFileSchema),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
@@ -49,6 +52,8 @@ type ParsedRegistryDependencyRef =
   | { kind: "local"; raw: string; name: string }
   | { kind: "namespace"; raw: string; namespace: string; name: string };
 
+export const REGISTRY_ORIGIN = "https://diffgazer.com";
+
 const NAMESPACE_REF_RE = /^(@[a-z0-9][\w-]*)\/([a-z0-9][\w-]*)$/i;
 
 export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependencyRef {
@@ -76,7 +81,7 @@ export function parseRegistryDependencyRef(ref: string): ParsedRegistryDependenc
   return { kind: "local", raw, name: raw };
 }
 
-function resolveRegistryDeps(
+export function resolveRegistryDeps(
   names: string[],
   getItem: (name: string) => RegistryItem | undefined,
   itemLabel = "item",
@@ -116,7 +121,7 @@ function resolveRegistryDeps(
   return [...resolved];
 }
 
-function collectNpmDeps(
+export function collectNpmDeps(
   names: string[],
   getItem: (name: string) => RegistryItem | undefined,
 ): string[] {
@@ -191,9 +196,26 @@ function validateIntegrity<TBundle extends { integrity?: string }>(
   }
 }
 
-export function metaField<T>(item: { meta?: Record<string, unknown> }, key: string, fallback: T): T {
+export function metaField<T extends string | number | boolean | string[]>(
+  item: { meta?: Record<string, unknown> },
+  key: string,
+  fallback: T,
+): T {
   const val = item.meta?.[key];
-  return val !== undefined ? (val as T) : fallback;
+  if (val === undefined) return fallback;
+  if (Array.isArray(fallback)) {
+    return Array.isArray(val) ? (val as T) : fallback;
+  }
+  switch (typeof fallback) {
+    case "string":
+      return typeof val === "string" ? (val as T) : fallback;
+    case "number":
+      return typeof val === "number" ? (val as T) : fallback;
+    case "boolean":
+      return typeof val === "boolean" ? (val as T) : fallback;
+    default:
+      return fallback;
+  }
 }
 
 interface CreateRegistryAccessorsOptions {
@@ -215,8 +237,12 @@ export interface RegistryAccessors {
 export function createRegistryAccessors(options: CreateRegistryAccessorsOptions): RegistryAccessors {
   const { loader, itemLabel, pathPrefixes, itemTypeFilter } = options;
 
+  let itemMap: Map<string, RegistryContentItem> | null = null;
   function getItem(name: string): RegistryContentItem | undefined {
-    return loader().items.find((item) => item.name === name);
+    if (!itemMap) {
+      itemMap = new Map(loader().items.map((i) => [i.name, i]));
+    }
+    return itemMap.get(name);
   }
 
   function getAllItems(): RegistryContentItem[] {

@@ -2,8 +2,8 @@ import { info, newline } from "../logger.js";
 
 export interface ListDisplayItem {
   name: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   dependencies: string[];
   files: string[];
 }
@@ -45,7 +45,7 @@ function printTable(displayItems: ListDisplayItem[], installedOnly: boolean, ite
 
   const maxLen = Math.max(...displayItems.map((item) => item.name.length)) + 2;
   for (const item of displayItems) {
-    info(`  ${item.name.padEnd(maxLen)} ${item.description}`);
+    info(`  ${item.name.padEnd(maxLen)} ${item.description ?? ""}`);
   }
   newline();
 }

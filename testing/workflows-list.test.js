@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { runListWorkflow } from "../dist/workflows/list.js";
-import { setSilent } from "../dist/logger.js";
+import { withSilent } from "./helpers.js";
 
 function makeItems() {
   return [
@@ -38,8 +38,7 @@ test("runListWorkflow", async (t) => {
   });
 
   await t.test("filters to installed only", () => {
-    setSilent(true);
-    try {
+    withSilent(() => {
       // This should not throw even with no installed items
       runListWorkflow({
         cwd: "/tmp",
@@ -53,8 +52,6 @@ test("runListWorkflow", async (t) => {
         isInstalled: ({ item }) => item.name === "button",
         toDisplayItem,
       });
-    } finally {
-      setSilent(false);
-    }
+    });
   });
 });

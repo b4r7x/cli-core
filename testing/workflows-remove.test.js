@@ -1,15 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { runRemoveWorkflow, findOrphanedNpmDeps } from "../dist/workflows/remove.js";
-import { setSilent } from "../dist/logger.js";
-
-function createTmp() {
-  return mkdtempSync(join(tmpdir(), "cli-core-remove-"));
-}
+import { createTmp, withSilentAsync } from "./helpers.js";
 
 test("findOrphanedNpmDeps", async (t) => {
   const allItems = [
@@ -56,93 +51,93 @@ test("findOrphanedNpmDeps", async (t) => {
 
 test("runRemoveWorkflow", async (t) => {
   await t.test("removes files and calls updateManifest", async () => {
-    setSilent(true);
     const tmp = createTmp();
-    try {
-      mkdirSync(join(tmp, "components"), { recursive: true });
-      writeFileSync(join(tmp, "components", "button.tsx"), "content");
+    await withSilentAsync(async () => {
+      try {
+        mkdirSync(join(tmp, "components"), { recursive: true });
+        writeFileSync(join(tmp, "components", "button.tsx"), "content");
 
-      let manifestUpdated = false;
-      await runRemoveWorkflow({
-        cwd: tmp,
-        names: ["button"],
-        yes: true,
-        dryRun: false,
-        itemPlural: "components",
-        requireConfig: () => ({}),
-        validateNames: () => {},
-        getAllItems: () => [{ name: "button" }],
-        getItemOrThrow: () => ({ name: "button" }),
-        getItemName: (i) => i.name,
-        isInstalled: () => false,
-        resolveFilesForItem: () => [{ absolutePath: join(tmp, "components", "button.tsx") }],
-        resolveAllowedBaseDirs: () => [tmp],
-        updateManifest: () => { manifestUpdated = true; },
-      });
+        let manifestUpdated = false;
+        await runRemoveWorkflow({
+          cwd: tmp,
+          names: ["button"],
+          yes: true,
+          dryRun: false,
+          itemPlural: "components",
+          requireConfig: () => ({}),
+          validateNames: () => {},
+          getAllItems: () => [{ name: "button" }],
+          getItemOrThrow: () => ({ name: "button" }),
+          getItemName: (i) => i.name,
+          isInstalled: () => false,
+          resolveFilesForItem: () => [{ absolutePath: join(tmp, "components", "button.tsx") }],
+          resolveAllowedBaseDirs: () => [tmp],
+          updateManifest: () => { manifestUpdated = true; },
+        });
 
-      assert.equal(existsSync(join(tmp, "components", "button.tsx")), false);
-      assert.equal(manifestUpdated, true);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+        assert.equal(existsSync(join(tmp, "components", "button.tsx")), false);
+        assert.equal(manifestUpdated, true);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 
   await t.test("dry run does not remove files", async () => {
-    setSilent(true);
     const tmp = createTmp();
-    try {
-      mkdirSync(join(tmp, "components"), { recursive: true });
-      writeFileSync(join(tmp, "components", "button.tsx"), "content");
+    await withSilentAsync(async () => {
+      try {
+        mkdirSync(join(tmp, "components"), { recursive: true });
+        writeFileSync(join(tmp, "components", "button.tsx"), "content");
 
-      await runRemoveWorkflow({
-        cwd: tmp,
-        names: ["button"],
-        yes: true,
-        dryRun: true,
-        itemPlural: "components",
-        requireConfig: () => ({}),
-        validateNames: () => {},
-        getAllItems: () => [{ name: "button" }],
-        getItemOrThrow: () => ({ name: "button" }),
-        getItemName: (i) => i.name,
-        isInstalled: () => false,
-        resolveFilesForItem: () => [{ absolutePath: join(tmp, "components", "button.tsx") }],
-        resolveAllowedBaseDirs: () => [tmp],
-        updateManifest: () => {},
-      });
+        await runRemoveWorkflow({
+          cwd: tmp,
+          names: ["button"],
+          yes: true,
+          dryRun: true,
+          itemPlural: "components",
+          requireConfig: () => ({}),
+          validateNames: () => {},
+          getAllItems: () => [{ name: "button" }],
+          getItemOrThrow: () => ({ name: "button" }),
+          getItemName: (i) => i.name,
+          isInstalled: () => false,
+          resolveFilesForItem: () => [{ absolutePath: join(tmp, "components", "button.tsx") }],
+          resolveAllowedBaseDirs: () => [tmp],
+          updateManifest: () => {},
+        });
 
-      assert.equal(existsSync(join(tmp, "components", "button.tsx")), true);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+        assert.equal(existsSync(join(tmp, "components", "button.tsx")), true);
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 
   await t.test("reports nothing when no files found", async () => {
-    setSilent(true);
     const tmp = createTmp();
-    try {
-      await runRemoveWorkflow({
-        cwd: tmp,
-        names: ["button"],
-        yes: true,
-        dryRun: false,
-        itemPlural: "components",
-        requireConfig: () => ({}),
-        validateNames: () => {},
-        getAllItems: () => [{ name: "button" }],
-        getItemOrThrow: () => ({ name: "button" }),
-        getItemName: (i) => i.name,
-        isInstalled: () => false,
-        resolveFilesForItem: () => [{ absolutePath: join(tmp, "nonexistent.tsx") }],
-        resolveAllowedBaseDirs: () => [tmp],
-        updateManifest: () => {},
-      });
-      // Should not throw
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-      setSilent(false);
-    }
+    await withSilentAsync(async () => {
+      try {
+        await runRemoveWorkflow({
+          cwd: tmp,
+          names: ["button"],
+          yes: true,
+          dryRun: false,
+          itemPlural: "components",
+          requireConfig: () => ({}),
+          validateNames: () => {},
+          getAllItems: () => [{ name: "button" }],
+          getItemOrThrow: () => ({ name: "button" }),
+          getItemName: (i) => i.name,
+          isInstalled: () => false,
+          resolveFilesForItem: () => [{ absolutePath: join(tmp, "nonexistent.tsx") }],
+          resolveAllowedBaseDirs: () => [tmp],
+          updateManifest: () => {},
+        });
+        // Should not throw
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    });
   });
 });

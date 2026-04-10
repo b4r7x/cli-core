@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
 import { detectPackageManager, detectSourceDir, readPackageJson } from "../dist/detect.js";
-
-function createTmp() {
-  return mkdtempSync(join(tmpdir(), "cli-core-detect-"));
-}
+import { createTmp } from "./helpers.js";
 
 test("readPackageJson", async (t) => {
   await t.test("reads valid package.json", () => {

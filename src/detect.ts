@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { readTsConfigPaths } from "./fs.js";
+import { readTsConfigPaths, isEnoent } from "./fs.js";
 import { warn, toErrorMessage } from "./logger.js";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
@@ -11,12 +12,6 @@ export interface PackageJson {
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   [key: string]: unknown;
-}
-
-function isEnoent(e: unknown): boolean {
-  if (!(e instanceof Error) || !("code" in e)) return false;
-  const err: Error & { code: unknown } = e;
-  return err.code === "ENOENT";
 }
 
 export function readPackageJson(cwd: string): PackageJson | null {
@@ -71,6 +66,11 @@ function fromLockfile(cwd: string): PackageManager | null {
 export function detectPackageManager(cwd: string, pkg?: PackageJson | null): PackageManager {
   const pkgJson = pkg ?? readPackageJson(cwd);
   return fromPackageManagerField(pkgJson) ?? fromUserAgent() ?? fromLockfile(cwd) ?? "npm";
+}
+
+export function readPackageVersion(importMetaUrl: string, relativePath: string): string {
+  const req = createRequire(importMetaUrl);
+  return (req(relativePath) as { version: string }).version;
 }
 
 export function detectSourceDir(cwd: string): string {
